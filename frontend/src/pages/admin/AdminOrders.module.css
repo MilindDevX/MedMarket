@@ -1,0 +1,131 @@
+.page { display: flex; flex-direction: column; gap: var(--sp-5); }
+
+.title { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--ink-900); letter-spacing: -0.3px; }
+.subtitle { font-size: 13px; color: var(--ink-500); margin-top: 4px; }
+
+.summaryRow {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.summaryCard {
+  background: var(--white);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4);
+  min-width: 100px;
+}
+.summaryLabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-400); margin-bottom: 4px; }
+.summaryValue { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+
+.filters {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.searchWrap { position: relative; flex: 1; min-width: 200px; display: flex; align-items: center; }
+.searchIcon { position: absolute; left: 11px; color: var(--ink-400); pointer-events: none; }
+.searchInput {
+  width: 100%; height: 40px;
+  padding: 0 14px 0 34px;
+  border: 1.5px solid var(--ink-200); border-radius: var(--r-md);
+  font-size: 14px; font-family: var(--font-body); outline: none; background: var(--white);
+  transition: border-color var(--duration);
+}
+.searchInput:focus { border-color: var(--green-600); }
+.clearBtn { position: absolute; right: 10px; color: var(--ink-400); display: flex; }
+.select {
+  height: 40px; padding: 0 12px;
+  border: 1.5px solid var(--ink-200); border-radius: var(--r-md);
+  font-size: 13px; font-family: var(--font-body); color: var(--ink-700);
+  background: var(--white); cursor: pointer; outline: none;
+}
+
+.tableWrap { background: var(--white); border: 1px solid var(--ink-200); border-radius: var(--r-xl); overflow: hidden; }
+.table { width: 100%; border-collapse: collapse; }
+.thead { background: var(--always-dark); }
+.th { padding: 11px 14px; text-align: left; font-size: 11px; font-weight: 700; color: var(--always-sub-muted); text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; }
+.tr { border-bottom: 1px solid var(--ink-100); transition: background var(--duration); }
+.tr:hover { background: var(--ink-50); }
+.td { padding: 13px 14px; vertical-align: middle; }
+
+.orderId { font-size: 13px; font-weight: 600; color: var(--ink-900); font-family: monospace; }
+.consumerName { font-size: 13px; font-weight: 600; color: var(--ink-900); }
+.consumerMobile { font-size: 11px; color: var(--ink-400); }
+.storeName { font-size: 13px; color: var(--ink-500); }
+.itemsList { font-size: 12px; color: var(--ink-500); max-width: 200px; }
+.total { font-size: 14px; font-weight: 700; color: var(--ink-900); }
+.typePill {
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: var(--r-full);
+}
+.typePillDelivery { color: var(--blue-700); background: var(--blue-50); }
+.typePillPickup   { color: var(--ink-500);  background: var(--ink-100); }
+.timestamp { font-size: 12px; color: var(--ink-400); white-space: nowrap; }
+
+.empty { padding: var(--sp-10); text-align: center; color: var(--ink-400); font-size: 14px; }
+
+@media (max-width: 900px) {
+  .table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+@media (max-width: 640px) {
+  .filters { flex-direction: column; }
+  .searchWrap { min-width: unset; width: 100%; }
+}
+
+/* ── KPI stat cards ── */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-3);
+}
+.kpiCard {
+  background: var(--white);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-5);
+}
+.kpiVal {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.kpiLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-400);
+}
+
+/* ── Filter row ── */
+.filterRow {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filterSelect {
+  height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid var(--ink-200);
+  border-radius: var(--r-md);
+  font-size: 13px;
+  font-family: var(--font-body);
+  color: var(--ink-700);
+  background: var(--white);
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--duration);
+}
+.filterSelect:focus { border-color: var(--green-600); }
+
+@media (max-width: 768px) {
+  .kpiRow { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .kpiRow { grid-template-columns: 1fr 1fr; }
+}
