@@ -1,0 +1,460 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  consumer
+  pharmacy_owner
+  admin
+}
+
+enum Purpose {
+  login
+  register
+  password_reset
+}
+
+enum StoreStatus {
+  pending
+  approved
+  rejected
+  suspended
+}
+
+enum DocumentType {
+  drug_license
+  gst_certificate
+  aadhaar
+  pan
+  store_photo
+}
+
+enum MedicineForm {
+  tablet
+  capsule
+  syrup
+  gel
+  powder
+  injection
+  drops
+  inhaler
+}
+
+enum MedicineSchedule {
+  otc
+  schedule_h
+  schedule_h1
+  schedule_x
+}
+
+enum InventoryStatus {
+  active
+  expired
+  recalled
+}
+
+enum DeliveryType {
+  delivery
+  pickup
+}
+
+enum OrderStatus {
+  confirmed
+  accepted
+  packing
+  dispatched
+  delivered
+  rejected
+  cancelled
+}
+
+enum PaymentMethod {
+  upi
+  card
+  cod
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum NotificationChannel {
+  sms
+  email
+  in_app
+}
+
+model User {
+  id            String   @id @default(uuid())
+  role          Role
+  name          String
+  email         String   @unique
+  mobile        String?
+  password_hash String?
+  google_id     String?  @unique
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  pharmacies         PharmacyStore[]    @relation("UserPharmacies")
+  verifiedStores     PharmacyStore[]    @relation("StoreVerifier")
+  medicinesCreated   MedicineMaster[]
+  blacklistedBatches BlacklistedBatch[] @relation("BatchBlacklistedBy")
+  orders             Order[]            @relation("UserOrders")
+  addresses          ConsumerAddress[]  @relation("UserAddresses")
+  auditLogs          AuditLog[]         @relation("AuditActor")
+  notifications      Notification[]     @relation("UserNotifications")
+  refreshTokens      RefreshToken[]
+  complaints         Complaint[]
+}
+
+model OtpTokens {
+  id         String    @id @default(uuid())
+  mobile     String
+  otp_hash   String
+  purpose    Purpose
+  expires_at DateTime
+  used_at    DateTime?
+  attempts   Int       @default(0)
+
+  @@index([mobile])
+}
+
+model PharmacyStore {
+  id String @id @default(uuid())
+
+  owner_id String
+  owner    User   @relation("UserPharmacies", fields: [owner_id], references: [id])
+
+  name         String
+  address_line String
+  city         String
+  state        String
+  pincode      String
+
+  latitude  Decimal?
+  longitude Decimal?
+
+  phone String
+  email String?
+
+  operating_hours Json?
+
+  status           StoreStatus @default(pending)
+  rejection_reason String?
+
+  drug_license_no String  @unique
+  gst_number      String
+  fssai_no        String?
+
+  verified_at DateTime?
+  verified_by String?
+  verifier    User?     @relation("StoreVerifier", fields: [verified_by], references: [id])
+
+  avg_rating    Decimal @default(0)
+  total_reviews Int     @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  documents   StoreDocument[]
+  bankAccount BankAccount?
+  inventory   StoreInventory[]
+  orders      Order[]
+
+  @@index([owner_id])
+}
+
+model StoreDocument {
+  id String @id @default(uuid())
+
+  store_id String
+  store    PharmacyStore @relation(fields: [store_id], references: [id])
+
+  doc_type DocumentType
+
+  s3_key            String
+  original_filename String
+  mime_type         String
+
+  uploaded_at DateTime @default(now())
+
+  @@index([store_id])
+}
+
+model BankAccount {
+  id String @id @default(uuid())
+
+  store_id String        @unique
+  store    PharmacyStore @relation(fields: [store_id], references: [id])
+
+  bank_name      String
+  account_holder String
+
+  account_number_encrypted String
+  ifsc_code                String
+
+  is_verified Boolean @default(false)
+
+  created_at DateTime @default(now())
+}
+
+model MedicineMaster {
+  id String @id @default(uuid())
+
+  name             String @unique
+  generic_name     String
+  salt_composition String
+
+  manufacturer String
+  category     String
+
+  form      MedicineForm
+  pack_size String
+
+  mrp Decimal
+
+  schedule MedicineSchedule @default(otc)
+
+  is_active Boolean @default(true)
+
+  created_by String?
+  creator    User?   @relation(fields: [created_by], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  inventory          StoreInventory[]
+  blacklistedBatches BlacklistedBatch[]
+}
+
+model StoreInventory {
+  id String @id @default(uuid())
+
+  store_id String
+  store    PharmacyStore @relation(fields: [store_id], references: [id])
+
+  medicine_id String
+  medicine    MedicineMaster @relation(fields: [medicine_id], references: [id])
+
+  batch_number String
+
+  mfg_date DateTime
+  exp_date DateTime
+
+  quantity      Int
+  selling_price Decimal
+
+  low_stock_threshold Int @default(10)
+
+  status InventoryStatus @default(active)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  orderItems OrderItem[]
+
+  @@unique([store_id, medicine_id, batch_number])
+  @@index([store_id, exp_date])
+  @@index([medicine_id])
+}
+
+model BlacklistedBatch {
+  id String @id @default(uuid())
+
+  medicine_id String
+  medicine    MedicineMaster @relation(fields: [medicine_id], references: [id])
+
+  batch_number String
+
+  reason String
+
+  blacklisted_by String?
+  admin          User?   @relation("BatchBlacklistedBy", fields: [blacklisted_by], references: [id])
+
+  blacklisted_at DateTime @default(now())
+
+  @@index([medicine_id])
+  @@index([batch_number])
+}
+
+model Order {
+  id String @id @default(uuid())
+
+  consumer_id String
+  consumer    User   @relation("UserOrders", fields: [consumer_id], references: [id])
+
+  store_id String
+  store    PharmacyStore @relation(fields: [store_id], references: [id])
+
+  delivery_type DeliveryType
+
+  delivery_address Json?
+
+  status OrderStatus @default(confirmed)
+
+  subtotal     Decimal
+  delivery_fee Decimal @default(0)
+  gst_amount   Decimal
+  total_amount Decimal
+
+  payment_method PaymentMethod
+  payment_status PaymentStatus @default(pending)
+
+  payment_ref String?
+
+  rejection_reason String?
+
+  accepted_at   DateTime?
+  dispatched_at DateTime?
+  delivered_at  DateTime?
+
+  created_at   DateTime    @default(now())
+  updated_at   DateTime    @updatedAt
+  cancelled_at DateTime?
+  items        OrderItem[]
+  complaints   Complaint[]
+
+  @@index([consumer_id])
+  @@index([store_id])
+}
+
+model OrderItem {
+  id String @id @default(uuid())
+
+  order_id String
+  order    Order  @relation(fields: [order_id], references: [id])
+
+  inventory_id String
+  inventory    StoreInventory @relation(fields: [inventory_id], references: [id])
+
+  medicine_name    String
+  salt_composition String
+  batch_number     String
+
+  quantity     Int
+  unit_price   Decimal
+  line_total   Decimal
+  mrp_at_order Decimal
+
+  @@index([order_id])
+  @@index([inventory_id])
+}
+
+model ConsumerAddress {
+  id String @id @default(uuid())
+
+  consumer_id String
+  consumer    User   @relation("UserAddresses", fields: [consumer_id], references: [id])
+
+  label        String
+  address_line String
+  city         String
+  pincode      String
+
+  latitude  Decimal?
+  longitude Decimal?
+
+  is_default Boolean @default(false)
+
+  created_at DateTime @default(now())
+
+  @@index([consumer_id])
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+
+  actor_id String?
+  actor    User?   @relation("AuditActor", fields: [actor_id], references: [id])
+
+  actor_role String
+
+  action String
+
+  entity_type String
+  entity_id   String
+
+  metadata Json?
+
+  ip_address String?
+
+  created_at DateTime @default(now())
+
+  @@index([actor_id])
+  @@index([entity_type, entity_id])
+}
+
+model Notification {
+  id String @id @default(uuid())
+
+  recipient_id String
+  recipient    User   @relation("UserNotifications", fields: [recipient_id], references: [id])
+
+  type String
+
+  title String
+  body  String
+
+  channel NotificationChannel
+
+  read_at DateTime?
+
+  sent_at DateTime?
+
+  created_at DateTime @default(now())
+
+  @@index([recipient_id])
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  user_id    String
+  user       User      @relation(fields: [user_id], references: [id])
+  token_hash String    @unique
+  expires_at DateTime
+  revoked_at DateTime?
+  created_at DateTime  @default(now())
+
+  @@index([user_id])
+}
+
+model Complaint {
+  id          String   @id @default(uuid())
+  consumer_id String
+  order_id    String?
+  store_id    String?
+  category    String   @default("order")
+  type        String
+  subject     String
+  body        String
+  status      String   @default("open")
+  resolution  String?
+  created_at  DateTime @default(now())
+  consumer    User     @relation(fields: [consumer_id], references: [id])
+  order       Order?   @relation(fields: [order_id], references: [id])
+}
+
+model PlatformSettings {
+  id               String   @id @default("singleton")
+  gst_rate         Decimal  @default(12)
+  delivery_fee     Decimal  @default(30)
+  free_delivery_threshold Decimal @default(200)
+  cod_limit        Decimal  @default(2000)
+  order_timeout_minutes Int @default(30)
+  expiry_warn_60   Boolean  @default(true)
+  expiry_warn_30   Boolean  @default(true)
+  dead_stock_alert Boolean  @default(true)
+  email_invoice    Boolean  @default(true)
+  sms_on_order     Boolean  @default(true)
+  updated_at       DateTime @updatedAt
+  updated_by       String?
+}
