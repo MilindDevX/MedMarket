@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: medmarket-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+  - type: cron
+    name: keep-backend-warm
+    env: node
+    schedule: "*/10 * * * *"
+    command: "curl -s https://medmarket-backend.onrender.com/health"
