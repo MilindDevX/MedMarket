@@ -1,0 +1,225 @@
+/* ── Base nav — no background (sits over dark hero) ── */
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  transition: background var(--duration) var(--ease), box-shadow var(--duration);
+}
+
+/* ── Scrolled state — white frosted glass ── */
+.scrolled {
+  background: rgba(255,255,255,0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 #E5E7EB;
+}
+
+.inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--sp-6);
+  height: 68px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+}
+
+/* ── Brand ── */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.brandDot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--green-500);
+  flex-shrink: 0;
+}
+
+/* Unscrolled (dark hero): white text */
+.brandName {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  color: #FFFFFF;
+  letter-spacing: -0.3px;
+  transition: color 0.2s;
+}
+
+/* Scrolled (white bg): dark text */
+.scrolled .brandName { color: #1C1C1A; }
+
+.brandSuffix {
+  font-size: 11px;
+  font-weight: 700;
+  color: #5DCBA8;
+  background: rgba(12,107,78,0.18);
+  padding: 2px 7px;
+  border-radius: 9999px;
+  border: 1px solid rgba(93,203,168,0.3);
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+.scrolled .brandSuffix {
+  color: var(--green-700);
+  background: var(--green-50);
+  border-color: var(--green-200);
+}
+
+/* ── Nav links ── */
+.links {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  margin-left: var(--sp-4);
+}
+
+/* Unscrolled: white */
+.link {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.85);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.link:hover { color: #FFFFFF; }
+
+/* Scrolled: dark */
+.scrolled .link { color: #3D3D3A; }
+.scrolled .link:hover { color: var(--green-700); }
+
+/* Active state */
+.linkActive {
+  color: #FFFFFF !important;
+  font-weight: 600;
+}
+.scrolled .linkActive {
+  color: var(--green-700) !important;
+}
+
+/* ── CTAs ── */
+.ctas {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-left: auto;
+}
+
+/* Unscrolled: ghost white button */
+.loginBtn {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: color 0.2s, background 0.2s;
+}
+.loginBtn:hover {
+  color: #FFFFFF;
+  background: rgba(255,255,255,0.1);
+}
+
+/* Scrolled: dark text */
+.scrolled .loginBtn { color: #3D3D3A; }
+.scrolled .loginBtn:hover { background: #F3F4F6; color: #1C1C1A; }
+
+/* Register button — always green, always readable */
+.registerBtn {
+  font-size: 14px;
+  font-weight: 700;
+  color: #FFFFFF;
+  background: var(--green-700);
+  padding: 9px 18px;
+  border-radius: var(--r-md);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.registerBtn:hover {
+  background: var(--green-600);
+  box-shadow: var(--shadow-green);
+}
+
+/* "Get started free" — white outline on transparent, green-filled on scroll */
+.signupBtn {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.12);
+  border: 1.5px solid rgba(255,255,255,0.3);
+  padding: 8px 16px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.signupBtn:hover {
+  background: rgba(255,255,255,0.2);
+  border-color: rgba(255,255,255,0.5);
+  color: #FFFFFF;
+}
+.scrolled .signupBtn {
+  color: var(--green-700);
+  background: var(--green-50);
+  border-color: var(--green-200);
+}
+.scrolled .signupBtn:hover { background: var(--green-100); }
+
+/* ── Hamburger (mobile) ── */
+.hamburger {
+  display: none;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-2);
+  border-radius: var(--r-md);
+  color: rgba(255,255,255,0.9);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.hamburger:hover { background: rgba(255,255,255,0.12); color: #FFFFFF; }
+.scrolled .hamburger { color: #1C1C1A; }
+.scrolled .hamburger:hover { background: #F3F4F6; }
+
+/* ── Mobile menu ── */
+.mobileMenu {
+  background: #FFFFFF;
+  border-top: 1px solid #E5E7EB;
+  padding: var(--sp-4) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  overflow: hidden;
+}
+
+.mobileLink {
+  font-size: 15px;
+  font-weight: 500;
+  color: #3D3D3A;
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid #F3F4F6;
+  text-decoration: none;
+}
+.mobileLink:hover { color: var(--green-700); }
+
+.mobileCtas {
+  display: flex;
+  gap: var(--sp-3);
+  padding-top: var(--sp-3);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .links, .ctas { display: none; }
+  .hamburger { display: flex; }
+}
