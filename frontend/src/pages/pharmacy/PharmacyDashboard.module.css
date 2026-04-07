@@ -1,0 +1,122 @@
+.page { display: flex; flex-direction: column; gap: var(--sp-5); }
+
+.pageHeader {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.title { font-family: var(--font-display); font-size: 28px; font-weight: 600; color: #1C1C1A; letter-spacing: -0.5px; }
+.subtitle { font-size: 14px; color: #5A5F6B; margin-top: 4px; }
+
+.verifiedBadge {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600;
+  color: #166534; background: #DCFCE7;
+  border: 1px solid #86EFAC;
+  padding: 6px 14px; border-radius: var(--r-full);
+  white-space: nowrap;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-4);
+}
+
+.midGrid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: var(--sp-5);
+}
+
+/* Cards */
+.chartCard, .ordersCard, .alertsCard, .predictionCard {
+  background: var(--white);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-xl);
+  padding: var(--sp-5);
+}
+
+.cardHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--sp-4);
+}
+
+.cardTitle {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: 16px; font-weight: 700; color: var(--ink-900); letter-spacing: -0.2px;
+}
+
+.viewAll {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 13px; font-weight: 600; color: var(--green-700);
+  transition: gap var(--duration);
+}
+.viewAll:hover { gap: 6px; }
+
+/* Orders */
+.orderList { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.orderRow {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-3);
+  border-radius: var(--r-md);
+  transition: background var(--duration);
+}
+.orderRow:hover { background: var(--ink-50); }
+
+.orderId { font-size: 12px; font-weight: 600; color: var(--ink-500); font-family: monospace; min-width: 100px; }
+.orderConsumer { font-size: 13px; font-weight: 500; color: var(--ink-800); flex: 1; }
+.orderTotal { font-size: 13px; font-weight: 700; color: var(--ink-900); }
+.orderStatus {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: var(--r-full);
+}
+
+/* Alerts */
+.alertGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--sp-3);
+}
+
+.alertItem {
+  padding: var(--sp-4);
+  border-radius: var(--r-lg);
+  border: 1px solid;
+}
+.alertExpired { background: #FFF1F1; border-color: #FECACA; }
+.alertCritical { background: #FFF7ED; border-color: #FED7AA; }
+.alertWarning { background: #FFFBEB; border-color: #FDE68A; }
+
+.alertName { font-size: 14px; font-weight: 700; color: var(--ink-900); margin-bottom: 2px; }
+.alertBatch { font-size: 11px; color: var(--ink-500); font-family: monospace; margin-bottom: var(--sp-3); }
+.alertMeta { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; font-size: 12px; color: var(--ink-500); }
+
+/* Prediction */
+.predictionCard {
+  display: flex; align-items: center; gap: var(--sp-6);
+  flex-wrap: wrap;
+}
+.predictionLeft {
+  display: flex; align-items: center; gap: var(--sp-3); min-width: 200px;
+}
+.predictionTitle { font-size: 15px; font-weight: 700; color: var(--ink-900); }
+.predictionSub { font-size: 12px; color: var(--ink-500); margin-top: 2px; }
+
+.predictionItems {
+  display: flex; gap: var(--sp-5); flex: 1; flex-wrap: wrap;
+}
+.predictionItem {
+  display: flex; flex-direction: column; gap: 3px;
+}
+.predName { font-size: 13px; font-weight: 600; color: var(--ink-800); }
+.predTrend { font-size: 15px; font-weight: 700; }
+.predReason { font-size: 11px; color: var(--ink-400); }
+
+@media (max-width: 1024px) {
+  .kpiGrid { grid-template-columns: repeat(2, 1fr); }
+  .midGrid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .kpiGrid { grid-template-columns: 1fr 1fr; }
+}
