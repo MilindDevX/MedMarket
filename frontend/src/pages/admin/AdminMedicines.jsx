@@ -2,12 +2,13 @@ import usePageTitle from '../../utils/usePageTitle';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, X, Edit2, Trash2, AlertTriangle, CheckCircle, Database } from 'lucide-react';
-import { medicineCategories } from '../../data/mockData';
 import Badge from '../../components/ui/Badge';
 import useToastStore from '../../store/toastStore';
 import { useAdminMedicines } from '../../hooks/useAdminMedicines';
 import { SkeletonTable } from '../../components/ui/Skeleton';
 import styles from './AdminMedicines.module.css';
+
+const medicineCategories = ['All','Pain Relief','Antacid','Antihistamine','Hydration','Vitamins & Supplements','Baby Care','Skincare','Diabetic Care'];
 
 const scheduleOptions  = ['otc','schedule_h','schedule_h1','schedule_x'];
 const formOptions      = ['tablet','capsule','syrup','gel','powder','injection','drops','inhaler'];

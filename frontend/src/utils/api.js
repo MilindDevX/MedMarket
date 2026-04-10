@@ -1,26 +1,30 @@
-const BASE_URL = import.meta.env.API_URL || 'http://localhost:3000/api/v1';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
+// Use sessionStorage instead of localStorage.
+// sessionStorage is cleared when the tab/browser closes, reducing the window
+// of token exposure compared to localStorage (which persists indefinitely).
+// It is still readable by JS on the same origin, so the XSS surface is
+// identical — but accidental persistence (e.g. shared computers) is eliminated.
 export function getTokens() {
   return {
-    accessToken:  localStorage.getItem('accessToken'),
-    refreshToken: localStorage.getItem('refreshToken'),
+    accessToken:  sessionStorage.getItem('accessToken'),
+    refreshToken: sessionStorage.getItem('refreshToken'),
   };
 }
 
 export function saveTokens(accessToken, refreshToken) {
-  localStorage.setItem('accessToken', accessToken);
-
-  if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+  sessionStorage.setItem('accessToken', accessToken);
+  if (refreshToken) sessionStorage.setItem('refreshToken', refreshToken);
 }
 
 export function clearTokens() {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('user');
+  sessionStorage.removeItem('accessToken');
+  sessionStorage.removeItem('refreshToken');
+  sessionStorage.removeItem('user');
 }
 
 export function saveUser(user) {
-  localStorage.setItem('user', JSON.stringify(user));
+  sessionStorage.setItem('user', JSON.stringify(user));
 }
 
 async function refreshAccessToken() {
@@ -28,13 +32,12 @@ async function refreshAccessToken() {
   if (!refreshToken) return null;
   try {
     const res = await fetch(`${BASE_URL}/auth/refresh`, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ refreshToken }),
+      body: JSON.stringify({ refreshToken }),
     });
     if (!res.ok) { clearTokens(); return null; }
     const data = await res.json();
-
     saveTokens(data.data.accessToken, data.data.refreshToken);
     return data.data.accessToken;
   } catch {
@@ -49,7 +52,6 @@ async function request(endpoint, options = {}) {
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
   let res = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
-
   const data = await res.json().catch(() => ({ message: 'Server returned an unexpected response.' }));
 
   if (res.status === 403) {
@@ -58,10 +60,9 @@ async function request(endpoint, options = {}) {
 
   if (res.status === 401) {
     const msg = (data.message || '').toLowerCase();
-    if (msg.includes('deactivate') || msg.includes('disabled') || msg.includes('inactive')) {
+    if (msg.includes('deactivat') || msg.includes('disabled') || msg.includes('inactive')) {
       throw new Error(data.message);
     }
-    // Token expired — attempt silent refresh
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers['Authorization'] = `Bearer ${newToken}`;

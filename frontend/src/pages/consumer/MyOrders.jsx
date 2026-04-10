@@ -8,8 +8,8 @@ import useToastStore from '../../store/toastStore';
 
 const statusConfig = {
   confirmed:  { label:'Confirmed',      color:'var(--blue-700)',     bg:'var(--blue-50)',       cancelable:true  },
-  accepted:   { label:'Accepted',       color:'var(--green-700)',    bg:'var(--green-50)',      cancelable:true  },
-  packing:    { label:'Being Packed',   color:'var(--warning-dark)', bg:'var(--warning-light)', cancelable:true  },
+  accepted:   { label:'Accepted',       color:'var(--green-700)',    bg:'var(--green-50)',      cancelable:false },
+  packing:    { label:'Being Packed',   color:'var(--warning-dark)', bg:'var(--warning-light)', cancelable:false },
   dispatched: { label:'On the Way',     color:'var(--green-700)',    bg:'var(--green-50)',      cancelable:false },
   delivered:  { label:'Delivered',      color:'var(--success-dark)', bg:'var(--success-light)', cancelable:false },
   rejected:   { label:'Rejected',       color:'var(--danger)',       bg:'var(--danger-light)',  cancelable:false },

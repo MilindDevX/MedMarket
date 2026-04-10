@@ -5,7 +5,7 @@ import App from './App';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import useAuthStore from './store/authStore';
 
-// Restore session from localStorage on startup
+// Restore session from sessionStorage on startup
 useAuthStore.getState().hydrate();
 
 ReactDOM.createRoot(document.getElementById('root')).render(

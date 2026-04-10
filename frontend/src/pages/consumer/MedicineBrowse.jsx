@@ -2,12 +2,14 @@ import { useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, SlidersHorizontal, Store } from 'lucide-react';
-import { medicineCategories } from '../../data/mockData';
+
 import Badge from '../../components/ui/Badge';
 import usePageTitle from '../../utils/usePageTitle';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import styles from './MedicineBrowse.module.css';
 import { useMedicines } from '../../hooks/useMedicines';
+
+const medicineCategories = ['All','Pain Relief','Antacid','Antihistamine','Hydration','Vitamins & Supplements','Baby Care','Skincare','Diabetic Care'];
 
 const sortOptions = [
   { value: 'relevance',  label: 'Relevance' },

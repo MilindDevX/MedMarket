@@ -18,10 +18,15 @@ export function PharmacyGuard({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Pending and rejected pharmacies go to the review-waiting screen.
+  // They haven't been approved yet, so they can't access the dashboard.
   if (pharmacyStatus === 'pending' || pharmacyStatus === 'rejected') {
     return <Navigate to="/pharmacy/pending" replace />;
   }
 
+  // FIXED: Suspended pharmacies previously fell through here and could still
+  // access the full dashboard. Now they are redirected to a dedicated page
+  // that explains the suspension and provides support contact info.
   if (pharmacyStatus === 'suspended') {
     return <Navigate to="/pharmacy/suspended" replace />;
   }
@@ -36,5 +41,4 @@ export function AdminGuard({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   return children;
-};
-
+}

@@ -1,18 +1,16 @@
 import { create } from 'zustand';
-import { mockConsumerOrders } from '../data/mockData';
 
+// Minimal in-memory store used only by Checkout to surface the placed order ID
+// immediately after POST /orders without waiting for a refetch.
+// MyOrders and OrderTracking always read from the real API via hooks.
 const useOrderStore = create((set, get) => ({
-  orders: [...mockConsumerOrders],
+  recentOrderId: null,
 
   addOrder: (order) => {
-    set({ orders: [order, ...get().orders] });
+    set({ recentOrderId: order?.id || null });
   },
 
-  getOrder: (id) => get().orders.find(o => o.id === id),
-
-  updateStatus: (id, status) => {
-    set({ orders: get().orders.map(o => o.id === id ? { ...o, status } : o) });
-  },
+  clearRecentOrder: () => set({ recentOrderId: null }),
 }));
 
 export default useOrderStore;
