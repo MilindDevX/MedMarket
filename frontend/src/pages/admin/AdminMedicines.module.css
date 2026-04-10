@@ -1,0 +1,98 @@
+.page { display: flex; flex-direction: column; gap: var(--sp-5); }
+
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-3); }
+.title { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--ink-900); letter-spacing: -0.3px; }
+.subtitle { font-size: 13px; color: var(--ink-500); margin-top: 4px; }
+
+.addBtn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 18px; background: var(--green-700); color: var(--white);
+  border: none; border-radius: var(--r-md); font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: background var(--duration), box-shadow var(--duration);
+}
+.addBtn:hover { background: var(--green-600); box-shadow: var(--shadow-green); }
+
+/* Filters */
+.filters { display: flex; gap: var(--sp-3); flex-wrap: wrap; align-items: center; }
+.searchWrap { position: relative; flex: 1; min-width: 220px; display: flex; align-items: center; }
+.searchIcon { position: absolute; left: 12px; color: var(--ink-400); pointer-events: none; }
+.searchInput {
+  width: 100%; height: 40px; padding: 0 36px 0 36px;
+  border: 1.5px solid var(--ink-200); border-radius: var(--r-md);
+  font-size: 14px; font-family: var(--font-body); outline: none; background: var(--white);
+  transition: border-color var(--duration);
+}
+.searchInput:focus { border-color: var(--green-600); }
+.clearX { position: absolute; right: 10px; color: var(--ink-400); padding: 3px; border-radius: var(--r-sm); display: flex; transition: color var(--duration); }
+.clearX:hover { color: var(--ink-900); }
+.select { height: 40px; padding: 0 12px; border: 1.5px solid var(--ink-200); border-radius: var(--r-md); font-size: 13px; font-family: var(--font-body); color: var(--ink-700); background: var(--white); cursor: pointer; outline: none; }
+
+/* Table */
+.tableWrap { background: var(--white); border: 1px solid var(--ink-200); border-radius: var(--r-xl); overflow: hidden; }
+.table { width: 100%; border-collapse: collapse; }
+.thead { background: var(--always-dark); }
+.th { padding: 11px 14px; text-align: left; font-size: 11px; font-weight: 700; color: var(--always-sub-muted); text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; }
+.tr { border-bottom: 1px solid var(--ink-100); transition: background 0.12s; }
+.td { padding: 13px 14px; vertical-align: middle; }
+
+.medName { font-size: 14px; font-weight: 600; color: var(--ink-900); }
+.medGeneric { font-size: 11px; color: var(--ink-400); margin-top: 2px; }
+.saltCell { font-size: 12px; color: var(--ink-500); max-width: 200px; }
+.catChip { font-size: 11px; font-weight: 600; color: var(--green-700); background: var(--green-50); border: 1px solid var(--green-200); padding: 2px 8px; border-radius: var(--r-full); white-space: nowrap; }
+
+.actions { display: flex; gap: var(--sp-1); }
+.actionBtn { width: 28px; height: 28px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; color: var(--ink-400); transition: background var(--duration), color var(--duration); }
+.actionBtn:hover { background: var(--ink-100); color: var(--ink-900); }
+
+.empty { padding: var(--sp-10); text-align: center; color: var(--ink-400); display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); font-size: 14px; }
+
+/* Modal */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 200; display: flex; align-items: center; justify-content: center; padding: var(--sp-5); }
+.modal { background: var(--white); border-radius: var(--r-2xl); width: 100%; max-width: 640px; box-shadow: var(--shadow-lg); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column; }
+.modalHeader { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-5) var(--sp-6); border-bottom: 1px solid var(--ink-200); }
+.modalTitle { font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--ink-900); letter-spacing: -0.3px; }
+.modalClose { display: flex; padding: 4px; border-radius: var(--r-sm); color: var(--ink-400); transition: color var(--duration); }
+.modalClose:hover { color: var(--ink-900); }
+.modalBody { padding: var(--sp-5) var(--sp-6); overflow-y: auto; }
+.modalFooter { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); padding: var(--sp-4) var(--sp-6); border-top: 1px solid var(--ink-200); }
+
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+.formField { display: flex; flex-direction: column; gap: 6px; }
+.span2 { grid-column: 1 / -1; }
+.formLabel { font-size: 12px; font-weight: 600; color: var(--ink-700); }
+.formInput {
+  height: 40px; padding: 0 12px;
+  border: 1.5px solid var(--ink-200); border-radius: var(--r-md);
+  font-size: 14px; font-family: var(--font-body); color: var(--ink-900); background: var(--white);
+  outline: none; transition: border-color var(--duration);
+}
+.formInput:focus { border-color: var(--green-600); }
+.formSelect {
+  height: 40px; padding: 0 10px;
+  border: 1.5px solid var(--ink-200); border-radius: var(--r-md);
+  font-size: 14px; font-family: var(--font-body); color: var(--ink-900); background: var(--white);
+  cursor: pointer; outline: none;
+}
+
+.scheduleWarning {
+  display: flex; align-items: flex-start; gap: var(--sp-2);
+  background: var(--warning-light); border: 1px solid #FDE68A;
+  border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
+  font-size: 13px; color: #92400E; margin-top: var(--sp-4); line-height: 1.5;
+}
+.scheduleWarning svg { color: var(--warning); flex-shrink: 0; margin-top: 1px; }
+
+.cancelBtn { padding: 9px 18px; background: var(--white); color: var(--ink-600); border: 1px solid var(--ink-200); border-radius: var(--r-md); font-size: 14px; font-weight: 600; cursor: pointer; transition: background var(--duration); }
+.cancelBtn:hover { background: var(--ink-50); }
+.saveBtn { display: flex; align-items: center; gap: 6px; padding: 9px 18px; background: var(--green-700); color: var(--white); border: none; border-radius: var(--r-md); font-size: 14px; font-weight: 700; cursor: pointer; transition: background var(--duration); }
+.saveBtn:hover { background: var(--green-600); }
+
+@media (max-width: 900px) {
+  .formGrid { grid-template-columns: 1fr; }
+  .span2 { grid-column: 1; }
+}
+@media (max-width: 640px) {
+  .modal { margin: var(--sp-3); border-radius: var(--r-xl); }
+  .filters { flex-direction: column; }
+  .searchWrap { min-width: unset; }
+}
