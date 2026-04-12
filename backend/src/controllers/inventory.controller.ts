@@ -37,7 +37,8 @@ export async function addInventory(req: Request, res: Response) {
     if (!medicine) {
       return errorResponse(res, "Medicine not found", 404);
     }
-    
+
+
     if (medicine.schedule !== "otc") {
       return errorResponse(
         res,

@@ -16,7 +16,6 @@ import {
 
 const router = Router();
 
-
 router.get("/",     listMedicines);
 router.get("/:id",  getMedicine);
 router.post("/",    authenticate, requireAdmin, validate(createMedicineSchema), createMedicine);

@@ -8,6 +8,7 @@ export const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Auth limiter: kept at 20/10min — appropriate for login/register flows.
 export const authLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
   max: 20,
@@ -16,6 +17,7 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Order limiter: applied to POST /orders to prevent order spam.
 export const orderLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 30,

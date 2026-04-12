@@ -25,7 +25,6 @@ export default function AdminAnalytics() {
     const totalGmv  = delivered.reduce((s, o) => s + Number(o.total_amount || 0), 0);
     const avgOrder  = delivered.length > 0 ? totalGmv / delivered.length : 0;
 
-    // Last 7 calendar days — not day-of-week buckets
     const revenueByDay = [];
     for (let i = 6; i >= 0; i--) {
       const d       = new Date();
@@ -63,7 +62,6 @@ export default function AdminAnalytics() {
     return { totalGmv, avgOrder, revenueByDay, ordersByStatus, topMeds, geoData };
   }, [orders, apps]);
 
-  // If /admin/orders endpoint is not implemented, show notice
   const ordersError = orders.length === 0 && !ordersLoading;
 
   if (loading) return (

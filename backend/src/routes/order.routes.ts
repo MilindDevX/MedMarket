@@ -23,7 +23,6 @@ router.get("/my/:id",         authenticate, requireRole("consumer"), getOrder);
 router.post("/my/:id/cancel", authenticate, requireRole("consumer"), cancelOrder);
 
 // ── Pharmacy routes ──
-// FIX 17: Added validate(updateOrderStatusSchema) to the status update route.
 router.get("/pharmacy",              authenticate, requireRole("pharmacy_owner"), getPharmacyOrders);
 router.patch("/pharmacy/:id/status", authenticate, requireRole("pharmacy_owner"), validate(updateOrderStatusSchema), updateOrderStatus);
 
