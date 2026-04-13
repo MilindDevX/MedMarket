@@ -5,6 +5,8 @@ import { validate, updateStoreSchema } from "../middleware/validate.middleware.t
 
 const router = Router();
 
+// FIX 18: Added validate(updateStoreSchema) to PATCH /me — previously no
+// validation on store profile updates.
 router.post("/",    authenticate, requireRole("pharmacy_owner"), registerStore);
 router.get("/me",   authenticate, getMyStore);
 router.patch("/me", authenticate, requireRole("pharmacy_owner"), validate(updateStoreSchema), updateMyStore);

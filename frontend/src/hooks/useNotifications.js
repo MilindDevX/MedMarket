@@ -17,6 +17,7 @@ export function useNotifications() {
   useEffect(() => { fetch(); }, [fetch]);
 
   const markOneRead = useCallback(async (id) => {
+    // Optimistic update
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
     try { await api.patch(`/notifications/${id}/read`, {}); }
     catch { fetch(); } // revert on error

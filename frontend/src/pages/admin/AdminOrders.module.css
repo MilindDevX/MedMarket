@@ -73,3 +73,59 @@
   .filters { flex-direction: column; }
   .searchWrap { min-width: unset; width: 100%; }
 }
+
+/* ── KPI stat cards ── */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-3);
+}
+.kpiCard {
+  background: var(--white);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-5);
+}
+.kpiVal {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.kpiLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-400);
+}
+
+/* ── Filter row ── */
+.filterRow {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filterSelect {
+  height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid var(--ink-200);
+  border-radius: var(--r-md);
+  font-size: 13px;
+  font-family: var(--font-body);
+  color: var(--ink-700);
+  background: var(--white);
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--duration);
+}
+.filterSelect:focus { border-color: var(--green-600); }
+
+@media (max-width: 768px) {
+  .kpiRow { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .kpiRow { grid-template-columns: 1fr 1fr; }
+}

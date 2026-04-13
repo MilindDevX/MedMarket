@@ -4,7 +4,7 @@ import { api, saveTokens, clearTokens, saveUser, getTokens } from '../utils/api'
 function friendlyLoginError(msg) {
   const m = (msg || '').toLowerCase();
   if (m.includes('deactivat') || m.includes('disabled') || m.includes('inactive') || m.includes('suspended')) {
-    return 'Your account has been deactivated. Please contact support.';
+    return 'DEACTIVATED';
   }
   return msg || 'Login failed. Please try again.';
 }
@@ -70,7 +70,7 @@ const useAuthStore = create((set, get) => ({
     try {
       const { refreshToken } = getTokens();
       if (refreshToken) await api.post('/auth/logout', { refreshToken });
-    } catch { /* ignore */ } finally {
+    } catch { } finally {
       clearTokens();
       set({ user: null, role: null, isAuthenticated: false, pharmacyStatus: null });
     }
@@ -87,7 +87,6 @@ const useAuthStore = create((set, get) => ({
   },
 
   hydrate: () => {
-    // Uses sessionStorage via getTokens() — session is restored within the same tab session
     const { accessToken } = getTokens();
     const stored = sessionStorage.getItem('user');
     if (accessToken && stored) {

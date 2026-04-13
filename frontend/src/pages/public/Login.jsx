@@ -2,7 +2,7 @@ import usePageTitle from '../../utils/usePageTitle';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Store, Shield, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { User, Store, Shield, ArrowRight, Eye, EyeOff, Phone, Mail } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import styles from './Login.module.css';
 
@@ -16,11 +16,12 @@ export default function Login() {
   usePageTitle('Sign In');
 
   const [selectedRole, setSelectedRole] = useState(null);
-  const [email, setEmail]               = useState('');
-  const [password, setPassword]         = useState('');
+  const [email,        setEmail]        = useState('');
+  const [password,     setPassword]     = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading]           = useState(false);
-  const [error, setError]               = useState('');
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState('');
+  const [isDeactivated, setIsDeactivated] = useState(false);
 
   const { login } = useAuthStore();
   const navigate  = useNavigate();
@@ -28,6 +29,7 @@ export default function Login() {
   const handleRoleSelect = (roleId) => {
     setSelectedRole(roleId);
     setError('');
+    setIsDeactivated(false);
     setEmail('');
     setPassword('');
   };
@@ -39,11 +41,11 @@ export default function Login() {
 
     setLoading(true);
     setError('');
+    setIsDeactivated(false);
 
     try {
       const user = await login(email, password);
 
-      // Validate role matches what user selected
       const roleMatches = (
         (selectedRole === 'consumer'       && user.role === 'consumer') ||
         (selectedRole === 'pharmacy_owner' && user.role === 'pharmacy_owner') ||
@@ -51,7 +53,6 @@ export default function Login() {
       );
 
       if (!roleMatches) {
-        // Log them back out and show a clear message
         await useAuthStore.getState().logout();
         const roleLabel = { consumer:'Patient', pharmacy_owner:'Pharmacy', admin:'Admin' };
         setError(`This account is a ${roleLabel[user.role] || user.role} account. Please select the correct role.`);
@@ -66,7 +67,12 @@ export default function Login() {
       }
       else navigate('/admin/dashboard');
     } catch (err) {
-      setError(err.message || 'Invalid credentials. Please try again.');
+      if (err.message === 'DEACTIVATED') {
+        setIsDeactivated(true);
+        setError('');
+      } else {
+        setError(err.message || 'Invalid credentials. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -146,6 +152,30 @@ export default function Login() {
                 </div>
 
                 {error && <div className={styles.error}>{error}</div>}
+
+                {/* Deactivated account — show contact info instead of generic error */}
+                <AnimatePresence>
+                  {isDeactivated && (
+                    <motion.div
+                      initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
+                      style={{ background:'#FFF5F5', border:'1px solid #FECACA', borderRadius:10, padding:'var(--sp-4)' }}>
+                      <p style={{ fontSize:13, fontWeight:700, color:'var(--danger)', marginBottom:'var(--sp-3)' }}>
+                        Your account has been deactivated.
+                      </p>
+                      <p style={{ fontSize:13, color:'#7F1D1D', lineHeight:1.6, marginBottom:'var(--sp-3)' }}>
+                        If you believe this is a mistake, please contact our support team:
+                      </p>
+                      <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-2)' }}>
+                        <a href="tel:18001234567" style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, fontWeight:600, color:'var(--danger)', textDecoration:'none' }}>
+                          <Phone size={13} strokeWidth={2.5} /> 1800-123-4567 (toll-free, 9am–6pm)
+                        </a>
+                        <a href="mailto:support@medmarket.in" style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, fontWeight:600, color:'var(--danger)', textDecoration:'none' }}>
+                          <Mail size={13} strokeWidth={2.5} /> support@medmarket.in
+                        </a>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <button type="submit" className={styles.submitBtn} disabled={loading}>
                   {loading ? <span className={styles.spinner} /> : <>Sign in <ArrowRight size={16} strokeWidth={2} /></>}

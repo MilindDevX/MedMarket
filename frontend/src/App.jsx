@@ -23,6 +23,7 @@ const ConsumerSignup = lazy(() => import('./pages/public/ConsumerSignup'));
 // Pharmacy
 const PharmacyRegister      = lazy(() => import('./pages/pharmacy/PharmacyRegister'));
 const PharmacyPending       = lazy(() => import('./pages/pharmacy/PharmacyPending'));
+// ADDED: Suspended page for pharmacies whose accounts have been suspended by admin.
 const PharmacySuspended     = lazy(() => import('./pages/pharmacy/PharmacySuspended'));
 const PharmacyDashboard     = lazy(() => import('./pages/pharmacy/PharmacyDashboard'));
 const PharmacyInventory     = lazy(() => import('./pages/pharmacy/PharmacyInventory'));

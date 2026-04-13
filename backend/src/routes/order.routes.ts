@@ -16,6 +16,9 @@ import {
 
 const router = Router();
 
+// FIX 16: Added requireRole guards to all order routes.
+// Previously a pharmacy_owner could call consumer order endpoints and vice versa.
+
 // ── Consumer routes ──
 router.post("/",              authenticate, requireRole("consumer"), validate(placeOrderSchema), placeOrder);
 router.get("/my",             authenticate, requireRole("consumer"), getMyOrders);
@@ -23,6 +26,7 @@ router.get("/my/:id",         authenticate, requireRole("consumer"), getOrder);
 router.post("/my/:id/cancel", authenticate, requireRole("consumer"), cancelOrder);
 
 // ── Pharmacy routes ──
+// FIX 17: Added validate(updateOrderStatusSchema) to the status update route.
 router.get("/pharmacy",              authenticate, requireRole("pharmacy_owner"), getPharmacyOrders);
 router.patch("/pharmacy/:id/status", authenticate, requireRole("pharmacy_owner"), validate(updateOrderStatusSchema), updateOrderStatus);
 

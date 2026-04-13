@@ -23,17 +23,22 @@ export default defineConfig([
       },
     },
     rules: {
+      // Warn (not error) on unused vars; allow uppercase components,
+      // _prefixed args, rest siblings, and 'motion' from framer-motion
+      // (ESLint doesn't recognize motion.div JSX or Icon components as usage)
       'no-unused-vars': ['warn', {
         varsIgnorePattern: '^(_|[A-Z]|motion$)',
         argsIgnorePattern: '^(_|[A-Z])',
         ignoreRestSiblings: true,
         caughtErrors: 'none',
       }],
-
+      // Allow intentional empty catch blocks
       'no-empty': ['warn', { allowEmptyCatch: true }],
-
+      // Standard data-fetching: useEffect(() => { fetch() }, [fetch])
+      // setState inside .then() is async — not a synchronous cascade
       'react-hooks/set-state-in-effect': 'off',
-
+      // Date.now() inside useMemo/useCallback is acceptable; the memo
+      // dependency array controls when it re-runs, not every render
       'react-hooks/purity': 'off',
     },
   },

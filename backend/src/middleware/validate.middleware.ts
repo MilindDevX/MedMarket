@@ -26,6 +26,9 @@ export const registerSchema = z.object({
   name:     z.string().min(2).max(120),
   email:    z.string().email(),
   mobile:   z.string().regex(/^[6-9]\d{9}$/, 'Invalid Indian mobile number'),
+  // FIX 9: Removed 'admin' from the enum. Previously a user could submit
+  // role:'admin' and (combined with the missing-return bug) create an admin
+  // account through the public registration endpoint.
   role:     z.enum(['consumer', 'pharmacy_owner']),
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
@@ -71,6 +74,7 @@ export const addInventorySchema = z.object({
   low_stock_threshold: z.number().int().positive().optional(),
 });
 
+// FIX 10: Added validation schema for PATCH /inventory/:id (previously had none).
 export const updateInventorySchema = z.object({
   quantity:            z.number().int().min(0).optional(),
   selling_price:       z.number().positive().optional(),
@@ -94,6 +98,8 @@ export const createMedicineSchema = z.object({
   category:         z.string().min(1).max(100),
   form:             z.enum(medicineFormValues),
   pack_size:        z.string().min(1).max(80),
+  // FIX 11: MRP must be positive — previously an admin could set mrp: -100
+  // which would then block all selling_price <= mrp checks from ever failing.
   mrp:              z.number().positive("MRP must be a positive number"),
   schedule:         z.enum(medicineScheduleValues).default("otc"),
 });
@@ -115,6 +121,7 @@ export const updateMedicineSchema = z.object({
 
 // ── Addresses ────────────────────────────────────────────────────────────────
 
+// FIX 12: Previously /consumer/addresses had no validation at all.
 export const addAddressSchema = z.object({
   label:        z.string().min(1).max(50),
   address_line: z.string().min(1),
@@ -135,6 +142,7 @@ export const updateAddressSchema = z.object({
 
 // ── Complaints ───────────────────────────────────────────────────────────────
 
+// FIX 13: Previously /consumer/complaints had no validation.
 export const fileComplaintSchema = z.object({
   type:     z.string().min(1).max(80),
   subject:  z.string().min(1).max(200),

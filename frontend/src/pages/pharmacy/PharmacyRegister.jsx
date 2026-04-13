@@ -2,11 +2,13 @@ import usePageTitle from '../../utils/usePageTitle';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Upload, ArrowRight, ArrowLeft, Store, FileText, User, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle, Upload, ArrowRight, ArrowLeft, Store, FileText, User, UserPlus, Eye, EyeOff, Loader } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import useToastStore from '../../store/toastStore';
-import { api } from '../../utils/api';
+import { api, getTokens } from '../../utils/api';
 import styles from './PharmacyRegister.module.css';
+
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
 const ALL_STEPS = [
   { id: 1, label: 'Create Account', icon: UserPlus },
@@ -15,16 +17,36 @@ const ALL_STEPS = [
   { id: 4, label: 'Owner Info',     icon: User },
 ];
 
+const DOC_FIELDS = [
+  { key: 'drugLicense', label: 'Drug License (Form 20/21) *', doc_type: 'drug_license' },
+  { key: 'gst',         label: 'GST Certificate *',           doc_type: 'gst_certificate' },
+  { key: 'aadhaar',     label: 'Owner Aadhaar Card *',        doc_type: 'aadhaar' },
+  { key: 'storeFront',  label: 'Store Photographs *',         doc_type: 'store_photo' },
+];
+
 const initialData = {
-  // Step 1 — account
   accountName: '', accountEmail: '', accountMobile: '', accountPassword: '', accountConfirm: '',
-  // Step 2 — store
   storeName: '', address: '', city: '', state: 'Haryana', pincode: '', phone: '', email: '',
-  // Step 3 — documents
   drugLicenseNo: '', gstNumber: '', fssaiNo: '',
-  // Step 4 — owner
   ownerName: '', ownerAadhaar: '', ownerPan: '', ownerMobile: '',
 };
+
+async function uploadDocumentToS3(file, doc_type) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('doc_type', doc_type);
+
+  const { accessToken } = getTokens();
+  const res = await fetch(`${BASE_URL}/pharmacy/documents`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: formData,
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Upload failed');
+  return data.data;
+}
 
 export default function PharmacyRegister() {
   usePageTitle('Register Your Pharmacy');
@@ -33,39 +55,29 @@ export default function PharmacyRegister() {
   const toast   = useToastStore();
   const navigate = useNavigate();
 
-  // If already logged in as pharmacy_owner, skip Step 1
   const alreadyLoggedIn = user?.role === 'pharmacy_owner';
   const startStep = alreadyLoggedIn ? 2 : 1;
   const steps = alreadyLoggedIn ? ALL_STEPS.slice(1) : ALL_STEPS;
 
-  const [step,      setStep]      = useState(startStep);
-  const [data,      setData]      = useState(initialData);
-  const [uploads,   setUploads]   = useState({ drugLicense:null, gst:null, aadhaar:null, storeFront:null });
-  const [submitted, setSubmitted] = useState(false);
-  const [loading,   setLoading]   = useState(false);
-  const [showPw,    setShowPw]    = useState(false);
-  const [showCf,    setShowCf]    = useState(false);
+  const [step,         setStep]         = useState(startStep);
+  const [data,         setData]         = useState(initialData);
+  const [fileObjects,  setFileObjects]  = useState({});
+  const [fileNames,    setFileNames]    = useState({});
+  const [uploadStatus, setUploadStatus] = useState({});
+  const [submitted,    setSubmitted]    = useState(false);
+  const [loading,      setLoading]      = useState(false);
+  const [showPw,       setShowPw]       = useState(false);
+  const [showCf,       setShowCf]       = useState(false);
 
   const set = (key, val) => setData(d => ({ ...d, [key]: val }));
 
-  // ── Validation ─────────────────────────────────────────────────────────────
   const validate = () => {
     if (step === 1) {
-      if (!data.accountName.trim() || data.accountName.trim().length < 2) {
-        toast.error('Enter your full name.'); return false;
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.accountEmail)) {
-        toast.error('Enter a valid email address.'); return false;
-      }
-      if (!/^[6-9]\d{9}$/.test(data.accountMobile)) {
-        toast.error('Enter a valid 10-digit Indian mobile number.'); return false;
-      }
-      if (data.accountPassword.length < 8) {
-        toast.error('Password must be at least 8 characters.'); return false;
-      }
-      if (data.accountPassword !== data.accountConfirm) {
-        toast.error('Passwords do not match.'); return false;
-      }
+      if (!data.accountName.trim() || data.accountName.trim().length < 2) { toast.error('Enter your full name.'); return false; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.accountEmail)) { toast.error('Enter a valid email address.'); return false; }
+      if (!/^[6-9]\d{9}$/.test(data.accountMobile)) { toast.error('Enter a valid 10-digit Indian mobile number.'); return false; }
+      if (data.accountPassword.length < 8) { toast.error('Password must be at least 8 characters.'); return false; }
+      if (data.accountPassword !== data.accountConfirm) { toast.error('Passwords do not match.'); return false; }
     }
     if (step === 2) {
       if (!data.storeName.trim()) { toast.error('Store name is required.'); return false; }
@@ -78,28 +90,19 @@ export default function PharmacyRegister() {
       if (!data.drugLicenseNo.trim()) { toast.error('Drug License Number is required.'); return false; }
       if (!data.gstNumber.trim())     { toast.error('GST Number is required.'); return false; }
       const gstPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-      if (!gstPattern.test(data.gstNumber.toUpperCase())) {
-        toast.error('GST Number format is invalid. Expected: 06AABCX1234D1Z5'); return false;
-      }
+      if (!gstPattern.test(data.gstNumber.toUpperCase())) { toast.error('GST Number format is invalid. Expected: 06AABCX1234D1Z5'); return false; }
     }
     if (step === 4) {
       if (!data.ownerName.trim()) { toast.error('Owner name is required.'); return false; }
-      if (!/^\d{12}$/.test(data.ownerAadhaar.replace(/\s/g, ''))) {
-        toast.error('Enter a valid 12-digit Aadhaar number.'); return false;
-      }
-      if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(data.ownerPan)) {
-        toast.error('Enter a valid PAN number (e.g. ABCDE1234F).'); return false;
-      }
-// ownerMobile now uses accountMobile from Step 1
+      if (!/^\d{12}$/.test(data.ownerAadhaar.replace(/\s/g, ''))) { toast.error('Enter a valid 12-digit Aadhaar number.'); return false; }
+      if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(data.ownerPan)) { toast.error('Enter a valid PAN number (e.g. ABCDE1234F).'); return false; }
     }
     return true;
   };
 
-  // ── Navigation ─────────────────────────────────────────────────────────────
   const handleNext = async () => {
     if (!validate()) return;
 
-    // Step 1 — create account first, get token, then proceed
     if (step === 1) {
       setLoading(true);
       try {
@@ -124,10 +127,18 @@ export default function PharmacyRegister() {
 
   const handleBack = () => setStep(s => s - 1);
 
-  // ── Submit store application ────────────────────────────────────────────────
+  const handleFileSelect = (key, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileObjects(prev => ({ ...prev, [key]: file }));
+    setFileNames(prev => ({ ...prev, [key]: file.name }));
+    setUploadStatus(prev => ({ ...prev, [key]: 'pending' }));
+  };
+
   const handleSubmit = async () => {
     if (!validate()) return;
     setLoading(true);
+
     try {
       await api.post('/pharmacy', {
         name:            data.storeName,
@@ -141,6 +152,27 @@ export default function PharmacyRegister() {
         gst_number:      data.gstNumber,
         fssai_no:        data.fssaiNo || '',
       });
+
+      const uploadResults = await Promise.allSettled(
+        DOC_FIELDS.map(async ({ key, doc_type }) => {
+          const file = fileObjects[key];
+          if (!file) return;
+          setUploadStatus(prev => ({ ...prev, [key]: 'uploading' }));
+          try {
+            await uploadDocumentToS3(file, doc_type);
+            setUploadStatus(prev => ({ ...prev, [key]: 'done' }));
+          } catch (err) {
+            setUploadStatus(prev => ({ ...prev, [key]: 'error' }));
+            throw new Error(`Failed to upload ${key}: ${err.message}`);
+          }
+        })
+      );
+
+      const failed = uploadResults.filter(r => r.status === 'rejected');
+      if (failed.length > 0) {
+        toast.warning('Store registered but some documents failed to upload. You can re-upload them from your profile.');
+      }
+
       setSubmitted(true);
     } catch (err) {
       toast.error(err.message || 'Failed to submit application. Please try again.');
@@ -149,18 +181,8 @@ export default function PharmacyRegister() {
     }
   };
 
-  const handleFileUpload = (key, e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // Store the file object for potential S3 upload, show name in UI
-    setUploads(u => ({ ...u, [key]: file.name }));
-    // Store actual file for future S3 upload
-    setUploads(u => ({ ...u, [`${key}_file`]: file }));
-  };
-
   const currentStepIndex = steps.findIndex(s => s.id === step);
 
-  // ── Success screen ──────────────────────────────────────────────────────────
   if (submitted) {
     return (
       <div className={styles.successPage}>
@@ -184,7 +206,6 @@ export default function PharmacyRegister() {
 
   return (
     <div className={styles.page}>
-      {/* Left panel */}
       <div className={styles.leftPanel}>
         <Link to="/" className={styles.brand}>
           <span className={styles.brandDot} /><span className={styles.brandName}>MedMarket India</span>
@@ -208,7 +229,6 @@ export default function PharmacyRegister() {
         </div>
       </div>
 
-      {/* Right panel */}
       <div className={styles.rightPanel}>
         <div className={styles.progressBar}>
           <div className={styles.progressFill} style={{ width:`${((currentStepIndex + 1) / steps.length) * 100}%` }} />
@@ -225,7 +245,6 @@ export default function PharmacyRegister() {
               initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }}
               exit={{ opacity:0, x:-20 }} transition={{ duration:0.2 }}>
 
-              {/* ── Step 1 — Create Account ── */}
               {step === 1 && (
                 <div className={styles.fields}>
                   <Field label="Full Name *" value={data.accountName} onChange={v => set('accountName', v)} placeholder="As per Aadhaar card" />
@@ -234,15 +253,8 @@ export default function PharmacyRegister() {
                   <div className={styles.field}>
                     <label className={styles.label}>Password * <span style={{ fontSize:11, fontWeight:400, color:'var(--ink-400)' }}>(min. 8 characters)</span></label>
                     <div style={{ position:'relative' }}>
-                      <input
-                        type={showPw ? 'text' : 'password'}
-                        className={styles.input}
-                        value={data.accountPassword}
-                        onChange={e => set('accountPassword', e.target.value)}
-                        placeholder="Minimum 8 characters"
-                      />
-                      <button type="button" onClick={() => setShowPw(s => !s)}
-                        style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color:'var(--ink-400)', background:'none', border:'none', cursor:'pointer', display:'flex', padding:2 }}>
+                      <input type={showPw ? 'text' : 'password'} className={styles.input} value={data.accountPassword} onChange={e => set('accountPassword', e.target.value)} placeholder="Minimum 8 characters" />
+                      <button type="button" onClick={() => setShowPw(s => !s)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color:'var(--ink-400)', background:'none', border:'none', cursor:'pointer', display:'flex', padding:2 }}>
                         {showPw ? <EyeOff size={16}/> : <Eye size={16}/>}
                       </button>
                     </div>
@@ -250,15 +262,8 @@ export default function PharmacyRegister() {
                   <div className={styles.field}>
                     <label className={styles.label}>Confirm Password *</label>
                     <div style={{ position:'relative' }}>
-                      <input
-                        type={showCf ? 'text' : 'password'}
-                        className={styles.input}
-                        value={data.accountConfirm}
-                        onChange={e => set('accountConfirm', e.target.value)}
-                        placeholder="Re-enter your password"
-                      />
-                      <button type="button" onClick={() => setShowCf(s => !s)}
-                        style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color:'var(--ink-400)', background:'none', border:'none', cursor:'pointer', display:'flex', padding:2 }}>
+                      <input type={showCf ? 'text' : 'password'} className={styles.input} value={data.accountConfirm} onChange={e => set('accountConfirm', e.target.value)} placeholder="Re-enter your password" />
+                      <button type="button" onClick={() => setShowCf(s => !s)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color:'var(--ink-400)', background:'none', border:'none', cursor:'pointer', display:'flex', padding:2 }}>
                         {showCf ? <EyeOff size={16}/> : <Eye size={16}/>}
                       </button>
                     </div>
@@ -269,7 +274,6 @@ export default function PharmacyRegister() {
                 </div>
               )}
 
-              {/* ── Step 2 — Store Details ── */}
               {step === 2 && (
                 <div className={styles.fields}>
                   <Field label="Store Name *"   value={data.storeName} onChange={v => set('storeName', v)} placeholder="e.g. Sharma Medical Store" />
@@ -285,39 +289,49 @@ export default function PharmacyRegister() {
                   <div className={styles.selectField}>
                     <label className={styles.label}>State *</label>
                     <select className={styles.select} value={data.state} onChange={e => set('state', e.target.value)}>
-                      {['Haryana','Delhi','Uttar Pradesh','Punjab','Rajasthan','Maharashtra','Karnataka'].map(s => (
-                        <option key={s}>{s}</option>
-                      ))}
+                      {['Haryana','Delhi','Uttar Pradesh','Punjab','Rajasthan','Maharashtra','Karnataka'].map(s => <option key={s}>{s}</option>)}
                     </select>
                   </div>
                 </div>
               )}
 
-              {/* ── Step 3 — Documents ── */}
               {step === 3 && (
                 <div className={styles.fields}>
                   <Field label="Drug License Number *"     value={data.drugLicenseNo} onChange={v => set('drugLicenseNo', v)} placeholder="HR-DL-20-2024-XXXXX" />
                   <Field label="GST Registration Number *" value={data.gstNumber}     onChange={v => set('gstNumber', v)}     placeholder="06AABCX1234D1Z5" />
                   <Field label="FSSAI License (optional)"  value={data.fssaiNo}       onChange={v => set('fssaiNo', v)}       placeholder="FSSAI License Number" />
+
                   <div className={styles.uploadSection}>
-                    <div className={styles.uploadLabel}>Upload Documents <span style={{ fontSize:11, color:'var(--ink-400)' }}></span></div>
-                    {[
-                      { key:'drugLicense', label:'Drug License (Form 20/21) *' },
-                      { key:'gst',         label:'GST Certificate *' },
-                      { key:'aadhaar',     label:'Owner Aadhaar Card *' },
-                      { key:'storeFront',  label:'Store Photographs *' },
-                    ].map(({ key, label }) => (
-                      <label key={key} className={`${styles.uploadBox} ${uploads[key] ? styles.uploadDone : ''}`} style={{ cursor:'pointer' }}><input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={e => handleFileUpload(key, e)} />
-                        {uploads[key]
-                          ? <><CheckCircle size={16} strokeWidth={2.5} style={{ color:'var(--green-700)' }} /><span className={styles.uploadFileName}>{uploads[key]}</span></>
-                          : <><Upload size={16} strokeWidth={1.8} style={{ color:'var(--ink-400)' }} /><span>{label} — Click to upload</span></>}
-                      </label>
-                    ))}
+                    <div className={styles.uploadLabel}>
+                      Upload Documents
+                      <span style={{ fontSize:11, color:'var(--ink-400)', fontWeight:400, marginLeft:6 }}>PDF, JPG or PNG · max 5 MB each</span>
+                    </div>
+                    {DOC_FIELDS.map(({ key, label }) => {
+                      const status = uploadStatus[key];
+                      const name   = fileNames[key];
+                      return (
+                        <label key={key}
+                          className={`${styles.uploadBox} ${name ? styles.uploadDone : ''}`}
+                          style={{ cursor:'pointer', position:'relative' }}>
+                          <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={e => handleFileSelect(key, e)} />
+                          {status === 'uploading' ? (
+                            <><Loader size={16} strokeWidth={2} style={{ color:'var(--green-700)', animation:'spin 1s linear infinite' }} /><span>Uploading…</span></>
+                          ) : status === 'done' ? (
+                            <><CheckCircle size={16} strokeWidth={2.5} style={{ color:'var(--green-700)' }} /><span className={styles.uploadFileName}>{name}</span><span style={{ fontSize:11, color:'var(--success-dark)', marginLeft:'auto' }}>Uploaded</span></>
+                          ) : status === 'error' ? (
+                            <><span style={{ fontSize:13, color:'var(--danger)' }}>⚠ Upload failed — {name}</span></>
+                          ) : name ? (
+                            <><CheckCircle size={16} strokeWidth={2.5} style={{ color:'var(--green-700)' }} /><span className={styles.uploadFileName}>{name}</span><span style={{ fontSize:11, color:'var(--ink-400)', marginLeft:'auto' }}>Ready to upload</span></>
+                          ) : (
+                            <><Upload size={16} strokeWidth={1.8} style={{ color:'var(--ink-400)' }} /><span>{label} — Click to upload</span></>
+                          )}
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* ── Step 4 — Owner Info ── */}
               {step === 4 && (
                 <div className={styles.fields}>
                   <Field label="Owner Full Name *" value={data.ownerName}    onChange={v => set('ownerName', v)}    placeholder="As per Aadhaar card" />
@@ -340,7 +354,6 @@ export default function PharmacyRegister() {
             </motion.div>
           </AnimatePresence>
 
-          {/* Nav buttons */}
           <div className={styles.navBtns}>
             {step > startStep && (
               <button className={styles.backBtn} onClick={handleBack} type="button">
