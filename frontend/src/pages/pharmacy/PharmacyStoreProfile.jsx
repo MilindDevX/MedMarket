@@ -14,7 +14,7 @@ const Field = ({ label, value, onChange, placeholder, type = 'text', readonly })
       style={{ height:42, padding:'0 14px', border:`1.5px solid ${readonly ? 'var(--ink-100)' : 'var(--ink-200)'}`, borderRadius:'var(--r-md)', fontSize:14, fontFamily:'var(--font-body)', outline:'none', background: readonly ? 'var(--ink-50)' : 'var(--white)', color: readonly ? 'var(--ink-400)' : 'var(--ink-900)', transition:'border-color 0.15s' }}
       onFocus={e => { if (!readonly) e.target.style.borderColor = 'var(--green-600)'; }}
       onBlur={e => e.target.style.borderColor = readonly ? 'var(--ink-100)' : 'var(--ink-200)'} />
-    {readonly && <p style={{ fontSize:11, color:'var(--ink-400)', lineHeight:1.4 }}>Read-only — contact admin to update</p>}
+
   </div>
 );
 
@@ -43,14 +43,12 @@ export default function PharmacyStoreProfile() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // PATCH /pharmacy/me — make sure backend has this route
-      // If not, add to admin.routes: router.patch('/pharmacy/me', authenticate, updateMyStore)
       await api.patch('/pharmacy/me', { phone, email, address_line: address, city, pincode });
       toast.success('Store profile updated successfully.');
       if (refetch) refetch();
     } catch (err) {
       if (err.message?.includes('404') || err.message?.includes('not found') || err.message?.includes('JSON') || err.message?.includes('json')) {
-        toast.error('Store profile update failed — the backend route PATCH /api/v1/pharmacy/me is not yet implemented. See BACKEND_FIXES.md #9.');
+        toast.error(err.message || 'Failed to save changes.');
       } else {
         toast.error(err.message || 'Failed to save changes.');
       }

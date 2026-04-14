@@ -15,8 +15,6 @@ import {
 
 const router = Router();
 
-// FIX 20: Added Zod validation to POST and PATCH address routes.
-// Previously any string (including invalid pincodes) was accepted.
 router.get("/",              authenticate, getAddresses);
 router.post("/",             authenticate, validate(addAddressSchema), addAddress);
 router.patch("/:id",         authenticate, validate(updateAddressSchema), updateAddress);

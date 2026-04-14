@@ -38,9 +38,6 @@ export async function addInventory(req: Request, res: Response) {
       return errorResponse(res, "Medicine not found", 404);
     }
 
-    // FIX 7: Enforce OTC-only rule at the backend. Previously a pharmacy could
-    // add Schedule H, H1, or X (prescription-only) drugs to their inventory.
-    // The spec explicitly restricts Phase 1 to OTC medicines only.
     if (medicine.schedule !== "otc") {
       return errorResponse(
         res,

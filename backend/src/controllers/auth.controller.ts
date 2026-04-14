@@ -21,8 +21,6 @@ export async function register(req: Request, res: Response) {
       return errorResponse(res, "All fields are required", 400);
     }
 
-    // FIX 1 (Critical): Missing `return` allowed execution to continue and
-    // create an admin account anyway. Now properly returns.
     if (role === "admin") {
       return errorResponse(res, "Admin accounts cannot be created through public registration.", 403);
     }
@@ -80,11 +78,6 @@ export async function login(req: Request, res: Response) {
 
     const user = await prisma.user.findUnique({ where: { email } });
 
-    // FIX 2: Split the null-user and inactive-user checks so we can return
-    // a clear, specific message for deactivated accounts instead of the
-    // generic "Invalid credentials" that was causing the frontend to show
-    // "Session expired" (it couldn't find the keyword "deactivated" in the
-    // old message). Use 403 so the frontend's 401-refresh logic doesn't fire.
     if (!user) {
       return errorResponse(res, "Invalid credentials", 401);
     }
@@ -156,10 +149,7 @@ export async function refresh(req: Request, res: Response) {
     if (!user || !user.is_active) {
       return errorResponse(res, "User not found or deactivated", 401);
     }
-
-    // FIX 3 (Refresh token rotation): Revoke the used refresh token and issue
-    // a brand-new one. This means a stolen refresh token is only usable once —
-    // the real user's next request will invalidate it.
+    
     await prisma.refreshToken.update({
       where: { id: stored.id },
       data: { revoked_at: new Date() },

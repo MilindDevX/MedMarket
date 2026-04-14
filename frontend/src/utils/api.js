@@ -1,10 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
-// Use sessionStorage instead of localStorage.
-// sessionStorage is cleared when the tab/browser closes, reducing the window
-// of token exposure compared to localStorage (which persists indefinitely).
-// It is still readable by JS on the same origin, so the XSS surface is
-// identical — but accidental persistence (e.g. shared computers) is eliminated.
 export function getTokens() {
   return {
     accessToken:  sessionStorage.getItem('accessToken'),

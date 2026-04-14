@@ -29,8 +29,6 @@ export async function uploadDocument(req: Request, res: Response) {
       publicId,
     );
 
-    // s3_key column stores the Cloudinary public_id for deletion later
-    // The secure_url is the direct access URL (no presigning needed)
     const existing = await prisma.storeDocument.findFirst({
       where: { store_id: store.id, doc_type },
     });
@@ -61,7 +59,6 @@ export async function uploadDocument(req: Request, res: Response) {
       });
     }
 
-    // Return the secure_url so the frontend can display/link it immediately
     return successResponse(
       res,
       { ...doc, url: secure_url },
@@ -88,8 +85,6 @@ export async function getDocumentUrl(req: Request, res: Response) {
 
     if (!isAdmin && !isOwner) return errorResponse(res, 'Access denied.', 403);
 
-    // Cloudinary URLs are permanent and public — no presigning needed
-    // Reconstruct the URL from the stored public_id
     const { v2: cloudinary } = await import('cloudinary');
     const resourceType = doc.mime_type === 'application/pdf' ? 'raw' : 'image';
     const url = cloudinary.url(doc.s3_key, { resource_type: resourceType, secure: true });

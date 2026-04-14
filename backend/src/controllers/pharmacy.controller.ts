@@ -13,11 +13,6 @@ export async function registerStore(req: Request, res: Response) {
     const existing = await prisma.pharmacyStore.findUnique({ where: { drug_license_no } });
 
     if (existing) {
-      // FIX 8: Previously a rejected pharmacy could never re-apply because their
-      // drug_license_no was still in the DB with a UNIQUE constraint, returning
-      // 409 forever. The spec says rejected stores must be able to resubmit.
-      // Allow re-application only if the existing record belongs to this owner
-      // and has 'rejected' status. Reset it back to 'pending' and update fields.
       if (existing.status === 'rejected' && existing.owner_id === req.userId) {
         const reapplied = await prisma.pharmacyStore.update({
           where: { id: existing.id },

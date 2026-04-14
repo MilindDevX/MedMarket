@@ -8,9 +8,6 @@ import styles from './ConsumerSignup.module.css';
 
 const STEPS = ['Account', 'Personal', 'Location'];
 
-// ── Field MUST live outside the parent component ──────────────────────────────
-// If defined inside, React treats it as a new component type on every render
-// and unmounts+remounts the input, destroying focus on every keystroke.
 function Field({ label, id, type = 'text', value, onChange, error, placeholder, suffix }) {
   return (
     <div className={styles.field}>

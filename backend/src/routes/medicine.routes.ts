@@ -16,9 +16,6 @@ import {
 
 const router = Router();
 
-// FIX 19: Added Zod validation schemas to POST and PATCH medicine routes.
-// Previously admin could create medicines with negative MRP, missing fields,
-// or invalid enum values like an unknown dosage form.
 router.get("/",     listMedicines);
 router.get("/:id",  getMedicine);
 router.post("/",    authenticate, requireAdmin, validate(createMedicineSchema), createMedicine);

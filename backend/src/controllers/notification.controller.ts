@@ -97,7 +97,6 @@ export async function createNotification(
       },
     });
   } catch (err) {
-    // Non-fatal — log but don't crash the parent request
     console.error('Failed to create notification:', err);
   }
 }

@@ -1,8 +1,5 @@
 import rateLimit from 'express-rate-limit';
 
-// FIX 22: General limiter reduced from 1000 to 200 requests per 15 minutes.
-// 1000 req/15min per IP is essentially no protection at all — it allows
-// ~67 requests per second from a single IP before triggering.
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 200,
