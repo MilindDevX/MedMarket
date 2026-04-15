@@ -1,0 +1,86 @@
+.page { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-3); }
+.title { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--ink-900); letter-spacing: -0.3px; }
+.subtitle { font-size: 13px; color: var(--ink-500); margin-top: 4px; }
+.headerActions { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+
+.alertLink { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--warning-dark); background: var(--warning-light); border: 1px solid #FDE68A; padding: 8px 14px; border-radius: var(--r-md); text-decoration: none; transition: all var(--duration); }
+.alertLink:hover { background: #FEF3C7; }
+
+.addBtn { display: flex; align-items: center; gap: 6px; padding: 9px 16px; background: var(--green-700); color: var(--white); border: none; border-radius: var(--r-md); font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--font-body); transition: background var(--duration); }
+.addBtn:hover { background: var(--green-600); }
+
+.filters { display: flex; gap: var(--sp-3); flex-wrap: wrap; align-items: center; }
+.searchWrap { position: relative; flex: 1; min-width: 220px; }
+.searchIcon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-400); pointer-events: none; }
+.searchInput { width: 100%; height: 40px; padding: 0 14px 0 34px; border: 1.5px solid var(--ink-200); border-radius: var(--r-md); font-size: 14px; font-family: var(--font-body); background: var(--white); outline: none; transition: border-color var(--duration); }
+.searchInput:focus { border-color: var(--green-600); }
+.filterBtns { display: flex; gap: var(--sp-1); flex-wrap: wrap; }
+.filterBtn { padding: 7px 14px; border-radius: var(--r-md); font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--ink-200); background: var(--white); color: var(--ink-500); transition: all var(--duration); font-family: var(--font-body); white-space: nowrap; }
+.filterBtn:hover { border-color: var(--green-300); color: var(--green-700); }
+.filterBtnActive { border-color: var(--green-700) !important; background: var(--green-50) !important; color: var(--green-700) !important; }
+
+.tableWrap { background: var(--white); border: 1px solid var(--ink-200); border-radius: var(--r-xl); overflow: hidden; }
+.table { width: 100%; border-collapse: collapse; }
+.thead tr { background: var(--always-dark); }
+.th { padding: 11px 14px; text-align: left; font-size: 11px; font-weight: 700; color: var(--always-sub-muted); text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; }
+.tr { border-bottom: 1px solid var(--ink-100); transition: background var(--duration); }
+.tr:hover { background: var(--ink-50); }
+.td { padding: 12px 14px; vertical-align: middle; }
+
+.medName { font-size: 14px; font-weight: 600; color: var(--ink-900); }
+.medCat  { font-size: 11px; color: var(--ink-400); margin-top: 2px; }
+.salt    { font-size: 13px; color: var(--ink-500); max-width: 180px; }
+.batch   { font-size: 12px; color: var(--ink-500); font-family: monospace; }
+.expOk   { font-size: 13px; color: var(--ink-700); }
+.expWarn { font-size: 13px; font-weight: 600; color: var(--warning-dark); }
+.expCrit { font-size: 13px; font-weight: 700; color: var(--danger); }
+.qtyOk   { font-size: 14px; font-weight: 600; color: var(--ink-900); }
+.qtyLow  { font-size: 14px; font-weight: 700; color: var(--danger); }
+.mrp     { font-size: 14px; font-weight: 600; color: var(--green-700); }
+
+.rowActions { display: flex; gap: var(--sp-1); align-items: center; }
+.editBtn { font-size: 12px; font-weight: 600; color: var(--green-700); background: var(--green-50); border: 1px solid var(--green-200); padding: 4px 11px; border-radius: var(--r-sm); cursor: pointer; font-family: var(--font-body); transition: all var(--duration); }
+.editBtn:hover { background: var(--green-700); color: var(--white); }
+.deleteBtn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--r-sm); color: var(--ink-400); background: none; border: none; cursor: pointer; transition: all var(--duration); }
+.deleteBtn:hover { background: var(--danger-light); color: var(--danger); }
+
+.empty { padding: var(--sp-10); text-align: center; color: var(--ink-400); display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); font-size: 14px; }
+
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 200; display: flex; align-items: center; justify-content: center; padding: var(--sp-5); }
+.modal { background: var(--white); border-radius: var(--r-2xl); width: 100%; max-width: 560px; box-shadow: var(--shadow-lg); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column; }
+.modalSm { max-width: 420px; }
+.modalHeader { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--ink-200); }
+.modalTitle { font-family: var(--font-display); font-size: 19px; font-weight: 600; color: var(--ink-900); letter-spacing: -0.2px; }
+.modalClose { display: flex; padding: 4px; border-radius: var(--r-sm); color: var(--ink-400); }
+.modalClose:hover { color: var(--ink-900); }
+.modalBody { padding: var(--sp-5); overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp-4); }
+.modalFooter { display: flex; gap: var(--sp-3); justify-content: flex-end; padding: var(--sp-4) var(--sp-5); border-top: 1px solid var(--ink-200); }
+
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+.formField { display: flex; flex-direction: column; gap: 6px; }
+.formLabel { font-size: 12px; font-weight: 600; color: var(--ink-700); }
+.formInput { height: 40px; padding: 0 12px; border: 1.5px solid var(--ink-200); border-radius: var(--r-md); font-size: 14px; font-family: var(--font-body); color: var(--ink-900); background: var(--white); outline: none; transition: border-color var(--duration); }
+.formInput:focus { border-color: var(--green-600); }
+.formInput:read-only { background: var(--ink-50); color: var(--ink-500); }
+.formSelect { height: 40px; padding: 0 10px; border: 1.5px solid var(--ink-200); border-radius: var(--r-md); font-size: 14px; font-family: var(--font-body); color: var(--ink-900); background: var(--white); cursor: pointer; outline: none; }
+
+.dpcoWarn { display: flex; align-items: flex-start; gap: 8px; background: var(--danger-light); border: 1px solid #FECACA; border-radius: var(--r-md); padding: var(--sp-3); font-size: 13px; color: var(--danger-dark, #991B1B); }
+.deleteWarning { display: flex; align-items: flex-start; gap: var(--sp-3); background: var(--warning-light); border: 1px solid #FDE68A; border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); font-size: 14px; color: var(--warning-dark); line-height: 1.6; }
+.cancelBtn { padding: 9px 18px; background: var(--white); color: var(--ink-700); border: 1px solid var(--ink-200); border-radius: var(--r-md); font-size: 14px; font-weight: 600; cursor: pointer; font-family: var(--font-body); }
+.cancelBtn:hover { background: var(--ink-50); }
+.saveBtn { display: flex; align-items: center; gap: 6px; padding: 9px 18px; background: var(--green-700); color: var(--white); border: none; border-radius: var(--r-md); font-size: 14px; font-weight: 700; cursor: pointer; font-family: var(--font-body); }
+.saveBtn:hover { background: var(--green-600); }
+.deleteConfirmBtn { display: flex; align-items: center; gap: 6px; padding: 9px 18px; background: var(--danger); color: var(--white); border: none; border-radius: var(--r-md); font-size: 14px; font-weight: 700; cursor: pointer; font-family: var(--font-body); }
+.deleteConfirmBtn:hover { background: #DC2626; }
+
+@media (max-width: 900px) {
+  .table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .formGrid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .headerActions { flex-direction: column; width: 100%; }
+  .filters { flex-direction: column; }
+  .searchWrap { min-width: unset; width: 100%; }
+}
