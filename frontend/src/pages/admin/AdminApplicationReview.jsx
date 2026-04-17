@@ -1,13 +1,12 @@
 import usePageTitle from '../../utils/usePageTitle';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle, XCircle, AlertTriangle, ArrowLeft,
-  Phone, Mail, MapPin, ShieldCheck, FileText, User,
-  ExternalLink, Edit2, Save, X
+  MapPin, ShieldCheck, FileText, User,
+  ExternalLink, Edit2, Save, X, Loader
 } from 'lucide-react';
-import { useAdminPharmacies } from '../../hooks/useAdminPharmacies';
 import { api } from '../../utils/api';
 import useToastStore from '../../store/toastStore';
 import { SkeletonCard } from '../../components/ui/Skeleton';
@@ -21,11 +20,8 @@ const verifyChecks = [
 ];
 
 const docTypeLabel = {
-  drug_license:    'Drug License',
-  gst_certificate: 'GST Certificate',
-  aadhaar:         'Aadhaar Card',
-  pan:             'PAN Card',
-  store_photo:     'Store Photo',
+  drug_license: 'Drug License', gst_certificate: 'GST Certificate',
+  aadhaar: 'Aadhaar Card', pan: 'PAN Card', store_photo: 'Store Photo',
 };
 
 const Info = ({ label, value }) => (
@@ -40,35 +36,41 @@ export default function AdminApplicationReview() {
   const { id }   = useParams();
   const navigate = useNavigate();
   const toast    = useToastStore();
-  const { apps, loading, approve, reject, refetch } = useAdminPharmacies(null);
-  const app = apps.find(a => a.id === id);
 
-  const [checked,        setChecked]        = useState({});
-  const [rejectReason,   setRejectReason]   = useState('');
-  const [showRejectBox,  setShowRejectBox]  = useState(false);
-  const [showSuspendBox, setShowSuspendBox] = useState(false);
-  const [submitting,     setSubmitting]     = useState(false);
+  const [app,         setApp]         = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [checked,     setChecked]     = useState({});
+  const [rejectReason,  setRejectReason]  = useState('');
+  const [showRejectBox, setShowRejectBox] = useState(false);
+  const [showSuspendBox,setShowSuspendBox]= useState(false);
+  const [submitting,  setSubmitting]  = useState(false);
+  const [editing,     setEditing]     = useState(false);
+  const [editData,    setEditData]    = useState({});
+  const [savingEdit,  setSavingEdit]  = useState(false);
 
-  // Inline edit state
-  const [editing,      setEditing]      = useState(false);
-  const [editData,     setEditData]     = useState({});
-  const [savingEdit,   setSavingEdit]   = useState(false);
+  const fetchApp = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get(`/admin/applications/${id}`);
+      setApp(res.data);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load application.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchApp(); }, [id]);
 
   const allChecked = verifyChecks.every(c => checked[c.id]);
   const toggle     = (cid) => setChecked(p => ({ ...p, [cid]: !p[cid] }));
 
   const startEdit = () => {
     setEditData({
-      name:            app.name            || '',
-      address_line:    app.address_line    || '',
-      city:            app.city            || '',
-      state:           app.state           || '',
-      pincode:         app.pincode         || '',
-      phone:           app.phone           || '',
-      email:           app.email           || '',
-      drug_license_no: app.drug_license_no || '',
-      gst_number:      app.gst_number      || '',
-      fssai_no:        app.fssai_no        || '',
+      name: app.name||'', address_line: app.address_line||'', city: app.city||'',
+      state: app.state||'', pincode: app.pincode||'', phone: app.phone||'',
+      email: app.email||'', drug_license_no: app.drug_license_no||'',
+      gst_number: app.gst_number||'', fssai_no: app.fssai_no||'',
     });
     setEditing(true);
   };
@@ -79,45 +81,54 @@ export default function AdminApplicationReview() {
       await api.patch(`/admin/applications/${id}`, editData);
       toast.success('Pharmacy details updated.');
       setEditing(false);
-      if (refetch) refetch();
-    } catch (err) {
-      toast.error(err.message || 'Failed to update details.');
-    } finally {
-      setSavingEdit(false);
-    }
+      fetchApp();
+    } catch (err) { toast.error(err.message || 'Failed to update details.'); }
+    finally { setSavingEdit(false); }
   };
 
   const handleApprove = async () => {
     if (!allChecked) { toast.error('Complete all verification checks before approving.'); return; }
     setSubmitting(true);
-    try   { await approve(id); toast.success(`${app.name} approved.`); navigate('/admin/pharmacies'); }
-    catch (err) { toast.error(err.message); }
+    try {
+      await api.patch(`/admin/applications/${id}/approve`, {});
+      toast.success(`${app.name} approved.`);
+      navigate('/admin/pharmacies');
+    } catch (err) { toast.error(err.message); }
     finally { setSubmitting(false); }
   };
 
   const handleReject = async () => {
     if (!rejectReason.trim()) { toast.error('Rejection reason is required.'); return; }
     setSubmitting(true);
-    try   { await reject(id, rejectReason); toast.warning(`${app.name} rejected.`); navigate('/admin/pharmacies'); }
-    catch (err) { toast.error(err.message); }
+    try {
+      await api.patch(`/admin/applications/${id}/reject`, { rejection_reason: rejectReason });
+      toast.warning(`${app.name} rejected.`);
+      navigate('/admin/pharmacies');
+    } catch (err) { toast.error(err.message); }
     finally { setSubmitting(false); }
   };
 
   const handleSuspend = async () => {
     setSubmitting(true);
-    try   { await api.patch(`/admin/applications/${id}/suspend`, {}); toast.warning(`${app.name} suspended.`); navigate('/admin/pharmacies'); }
-    catch (err) { toast.error(err.message || 'Failed to suspend.'); }
+    try {
+      await api.patch(`/admin/applications/${id}/suspend`, {});
+      toast.warning(`${app.name} suspended.`);
+      navigate('/admin/pharmacies');
+    } catch (err) { toast.error(err.message || 'Failed to suspend.'); }
     finally { setSubmitting(false); setShowSuspendBox(false); }
   };
 
   const handleReactivate = async () => {
     setSubmitting(true);
-    try   { await api.patch(`/admin/applications/${id}/approve`, {}); toast.success(`${app.name} reactivated.`); navigate('/admin/pharmacies'); }
-    catch (err) { toast.error(err.message || 'Failed to reactivate.'); }
+    try {
+      await api.patch(`/admin/applications/${id}/reactivate`, {});
+      toast.success(`${app.name} reactivated.`);
+      navigate('/admin/pharmacies');
+    } catch (err) { toast.error(err.message || 'Failed to reactivate.'); }
     finally { setSubmitting(false); }
   };
 
-  if (loading) return <div style={{ maxWidth:1000, margin:'0 auto' }}><SkeletonCard lines={12} /></div>;
+  if (loading) return <div style={{ maxWidth:1000 }}><SkeletonCard lines={12} /></div>;
 
   if (!app) return (
     <div style={{ textAlign:'center', padding:'var(--sp-10)', color:'var(--ink-400)' }}>
@@ -134,8 +145,8 @@ export default function AdminApplicationReview() {
   const statusBg    = { pending:'var(--warning-light)', approved:'var(--success-light)', rejected:'var(--danger-light)', suspended:'var(--warning-light)' };
 
   const ef = (key) => (
-    <input value={editData[key] || ''} onChange={e => setEditData(p => ({ ...p, [key]: e.target.value }))}
-      style={{ width:'100%', height:36, padding:'0 10px', border:'1.5px solid var(--green-200)', borderRadius:6, fontSize:14, fontFamily:'var(--font-body)', outline:'none', background:'var(--white)', boxSizing:'border-box' }} />
+    <input value={editData[key]||''} onChange={e => setEditData(p=>({...p,[key]:e.target.value}))}
+      style={{ width:'100%', height:36, padding:'0 10px', border:'1.5px solid var(--green-200)', borderRadius:6, fontSize:14, fontFamily:'var(--font-body)', outline:'none', boxSizing:'border-box' }} />
   );
 
   return (
@@ -153,7 +164,7 @@ export default function AdminApplicationReview() {
           </div>
           <div>
             <h1 style={{ fontFamily:'var(--font-display)', fontSize:22, fontWeight:600, color:'var(--ink-900)', letterSpacing:'-0.3px', marginBottom:4 }}>{app.name}</h1>
-            <span style={{ fontSize:12, fontWeight:700, padding:'2px 10px', borderRadius:9999, color: statusColor[app.status], background: statusBg[app.status] }}>
+            <span style={{ fontSize:12, fontWeight:700, padding:'2px 10px', borderRadius:9999, color:statusColor[app.status], background:statusBg[app.status] }}>
               {app.status?.toUpperCase()}
             </span>
           </div>
@@ -174,73 +185,51 @@ export default function AdminApplicationReview() {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 360px', gap:'var(--sp-5)', alignItems:'start' }}>
         <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-4)' }}>
 
-          {/* Store info */}
-          <div style={{ background:'var(--white)', border:`1px solid ${editing ? 'var(--green-200)' : 'var(--ink-200)'}`, borderRadius:16, padding:'var(--sp-5)' }}>
+          {/* Store info card */}
+          <div style={{ background:'var(--white)', border:`1px solid ${editing?'var(--green-200)':'var(--ink-200)'}`, borderRadius:16, padding:'var(--sp-5)' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'var(--sp-4)' }}>
               <div style={{ fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--ink-400)', display:'flex', alignItems:'center', gap:6 }}>
                 <MapPin size={13}/> Store Details
               </div>
               {editing && (
                 <div style={{ display:'flex', gap:'var(--sp-2)' }}>
-                  <button onClick={() => setEditing(false)} style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 12px', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:6, fontSize:12, fontWeight:600, color:'var(--ink-500)', cursor:'pointer', fontFamily:'var(--font-body)' }}>
+                  <button onClick={() => setEditing(false)}
+                    style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 12px', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:6, fontSize:12, fontWeight:600, color:'var(--ink-500)', cursor:'pointer', fontFamily:'var(--font-body)' }}>
                     <X size={12}/> Cancel
                   </button>
-                  <button onClick={handleSaveEdit} disabled={savingEdit} style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 12px', background:'var(--green-700)', border:'none', borderRadius:6, fontSize:12, fontWeight:600, color:'#FFF', cursor:'pointer', fontFamily:'var(--font-body)', opacity: savingEdit ? 0.7 : 1 }}>
-                    <Save size={12}/> {savingEdit ? 'Saving…' : 'Save'}
+                  <button onClick={handleSaveEdit} disabled={savingEdit}
+                    style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 12px', background:'var(--green-700)', border:'none', borderRadius:6, fontSize:12, fontWeight:600, color:'#FFF', cursor:'pointer', fontFamily:'var(--font-body)', opacity:savingEdit?0.7:1 }}>
+                    {savingEdit ? <Loader size={12}/> : <Save size={12}/>} {savingEdit?'Saving…':'Save'}
                   </button>
                 </div>
               )}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--sp-4)', marginBottom:'var(--sp-4)' }}>
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>Store Name</span>
-                {editing ? ef('name') : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app.name || '—'}</span>}
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>City</span>
-                {editing ? ef('city') : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app.city || '—'}</span>}
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>State</span>
-                {editing ? ef('state') : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app.state || '—'}</span>}
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>PIN Code</span>
-                {editing ? ef('pincode') : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app.pincode || '—'}</span>}
-              </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--sp-4)' }}>
+              {[['Store Name','name'],['City','city'],['State','state'],['PIN Code','pincode'],['Phone','phone'],['Email','email']].map(([lbl,key]) => (
+                <div key={key} style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>{lbl}</span>
+                  {editing ? ef(key) : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app[key]||'—'}</span>}
+                </div>
+              ))}
               <div style={{ gridColumn:'1/-1', display:'flex', flexDirection:'column', gap:4 }}>
                 <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>Address</span>
-                {editing ? ef('address_line') : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app.address_line || '—'}</span>}
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>Phone</span>
-                {editing ? ef('phone') : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app.phone || '—'}</span>}
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>Email</span>
-                {editing ? ef('email') : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app.email || '—'}</span>}
+                {editing ? ef('address_line') : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app.address_line||'—'}</span>}
               </div>
             </div>
           </div>
 
           {/* Licenses */}
-          <div style={{ background:'var(--white)', border:`1px solid ${editing ? 'var(--green-200)' : 'var(--ink-200)'}`, borderRadius:16, padding:'var(--sp-5)' }}>
+          <div style={{ background:'var(--white)', border:`1px solid ${editing?'var(--green-200)':'var(--ink-200)'}`, borderRadius:16, padding:'var(--sp-5)' }}>
             <div style={{ fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--ink-400)', marginBottom:'var(--sp-4)', display:'flex', alignItems:'center', gap:6 }}>
               <FileText size={13}/> Licenses & Registrations
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--sp-4)' }}>
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>Drug License No.</span>
-                {editing ? ef('drug_license_no') : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app.drug_license_no || '—'}</span>}
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>GST Number</span>
-                {editing ? ef('gst_number') : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app.gst_number || '—'}</span>}
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>FSSAI License</span>
-                {editing ? ef('fssai_no') : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app.fssai_no || '—'}</span>}
-              </div>
+              {[['Drug License No.','drug_license_no'],['GST Number','gst_number'],['FSSAI License','fssai_no']].map(([lbl,key]) => (
+                <div key={key} style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-400)' }}>{lbl}</span>
+                  {editing ? ef(key) : <span style={{ fontSize:14, color:'var(--ink-800)', fontWeight:500 }}>{app[key]||'—'}</span>}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -258,25 +247,25 @@ export default function AdminApplicationReview() {
             </div>
           )}
 
-          {/* Documents — with real Cloudinary URLs */}
+          {/* Documents */}
           <div style={{ background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16, padding:'var(--sp-5)' }}>
             <div style={{ fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--ink-400)', marginBottom:'var(--sp-4)', display:'flex', alignItems:'center', gap:6 }}>
               <FileText size={13}/> Submitted Documents
             </div>
             {app.documents && app.documents.length > 0 ? (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:'var(--sp-3)' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap:'var(--sp-3)' }}>
                 {app.documents.map(doc => (
                   <div key={doc.id} style={{ border:'1px solid var(--ink-200)', borderRadius:10, overflow:'hidden' }}>
                     {doc.url && doc.mime_type !== 'application/pdf' ? (
-                      <a href={doc.url} target="_blank" rel="noreferrer" style={{ display:'block', textDecoration:'none' }}>
+                      <a href={doc.url} target="_blank" rel="noreferrer">
                         <img src={doc.url} alt={doc.doc_type}
-                          style={{ width:'100%', height:120, objectFit:'cover', display:'block', background:'var(--ink-50)' }}
-                          onError={e => { e.target.style.display='none'; }} />
+                          style={{ width:'100%', height:110, objectFit:'cover', display:'block', background:'var(--ink-50)' }} />
                       </a>
                     ) : (
-                      <div style={{ height:120, background:'var(--ink-50)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <a href={doc.url || '#'} target="_blank" rel="noreferrer"
+                        style={{ display:'flex', height:110, alignItems:'center', justifyContent:'center', background:'var(--ink-50)', textDecoration:'none' }}>
                         <FileText size={32} strokeWidth={1} style={{ color:'var(--ink-300)' }} />
-                      </div>
+                      </a>
                     )}
                     <div style={{ padding:'var(--sp-2) var(--sp-3)' }}>
                       <div style={{ fontSize:12, fontWeight:600, color:'var(--ink-800)', marginBottom:4 }}>
@@ -295,60 +284,45 @@ export default function AdminApplicationReview() {
                 ))}
               </div>
             ) : (
-              <div style={{ fontSize:13, color:'var(--ink-400)', textAlign:'center', padding:'var(--sp-4)' }}>
-                No documents uploaded yet.
-              </div>
+              <p style={{ fontSize:13, color:'var(--ink-400)', textAlign:'center', padding:'var(--sp-4)' }}>No documents uploaded yet.</p>
             )}
           </div>
         </div>
 
-        {/* Right panel — actions */}
+        {/* Right — actions */}
         <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-4)' }}>
-
           {app.status === 'pending' && (
             <div style={{ background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16, padding:'var(--sp-5)' }}>
               <div style={{ display:'flex', alignItems:'center', gap:'var(--sp-2)', marginBottom:'var(--sp-4)' }}>
                 <ShieldCheck size={17} strokeWidth={1.8} style={{ color:'var(--green-700)' }} />
                 <span style={{ fontSize:15, fontWeight:700, color:'var(--ink-900)' }}>Verification Checklist</span>
               </div>
-              <p style={{ fontSize:12, color:'var(--ink-400)', marginBottom:'var(--sp-4)' }}>
-                Tick all boxes after reviewing uploaded documents.
-              </p>
               <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-2)', marginBottom:'var(--sp-5)' }}>
                 {verifyChecks.map(({ id:cid, label }) => (
                   <motion.div key={cid} onClick={() => toggle(cid)}
-                    style={{ display:'flex', alignItems:'flex-start', gap:'var(--sp-3)', padding:'var(--sp-3)', borderRadius:10, cursor:'pointer', background: checked[cid] ? 'var(--green-50)' : 'var(--ink-50)', border: `1px solid ${checked[cid] ? 'var(--green-200)' : 'var(--ink-100)'}`, transition:'all 0.15s' }}
+                    style={{ display:'flex', alignItems:'flex-start', gap:'var(--sp-3)', padding:'var(--sp-3)', borderRadius:10, cursor:'pointer', background:checked[cid]?'var(--green-50)':'var(--ink-50)', border:`1px solid ${checked[cid]?'var(--green-200)':'var(--ink-100)'}`, transition:'all 0.15s' }}
                     whileTap={{ scale:0.98 }}>
-                    <div style={{ width:20, height:20, borderRadius:6, border:`2px solid ${checked[cid] ? 'var(--green-700)' : 'var(--ink-300)'}`, background: checked[cid] ? 'var(--green-700)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1, transition:'all 0.15s' }}>
+                    <div style={{ width:20, height:20, borderRadius:6, border:`2px solid ${checked[cid]?'var(--green-700)':'var(--ink-300)'}`, background:checked[cid]?'var(--green-700)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1, transition:'all 0.15s' }}>
                       {checked[cid] && <CheckCircle size={13} strokeWidth={3} style={{ color:'#FFF' }} />}
                     </div>
-                    <span style={{ fontSize:13, color: checked[cid] ? 'var(--ink-900)' : 'var(--ink-600)', fontWeight: checked[cid] ? 600 : 400, lineHeight:1.5 }}>{label}</span>
+                    <span style={{ fontSize:13, color:checked[cid]?'var(--ink-900)':'var(--ink-600)', fontWeight:checked[cid]?600:400, lineHeight:1.5 }}>{label}</span>
                   </motion.div>
                 ))}
               </div>
-
               <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-2)' }}>
-                <button onClick={handleApprove} disabled={submitting || !allChecked}
-                  style={{ width:'100%', padding:'11px', background: allChecked ? 'var(--green-700)' : 'var(--ink-200)', color: allChecked ? '#FFF' : 'var(--ink-400)', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor: allChecked ? 'pointer' : 'not-allowed', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.15s' }}>
-                  <CheckCircle size={15} strokeWidth={2.5} />
-                  {submitting ? 'Processing…' : 'Approve Application'}
+                <button onClick={handleApprove} disabled={submitting||!allChecked}
+                  style={{ width:'100%', padding:'11px', background:allChecked?'var(--green-700)':'var(--ink-200)', color:allChecked?'#FFF':'var(--ink-400)', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:allChecked?'pointer':'not-allowed', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.15s' }}>
+                  <CheckCircle size={15} strokeWidth={2.5} /> {submitting?'Processing…':'Approve Application'}
                 </button>
-                <button onClick={() => setShowRejectBox(s => !s)} disabled={submitting}
+                <button onClick={() => setShowRejectBox(s=>!s)} disabled={submitting}
                   style={{ width:'100%', padding:'11px', background:'var(--white)', color:'var(--danger)', border:'1.5px solid #FECACA', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
                   <XCircle size={15} strokeWidth={2.5} /> Reject
                 </button>
               </div>
-
-              {!allChecked && (
-                <p style={{ fontSize:11, color:'var(--ink-400)', marginTop:'var(--sp-2)', textAlign:'center' }}>
-                  Complete all {verifyChecks.length} checks to enable approval
-                </p>
-              )}
-
+              {!allChecked && <p style={{ fontSize:11, color:'var(--ink-400)', marginTop:'var(--sp-2)', textAlign:'center' }}>Complete all {verifyChecks.length} checks to enable approval</p>}
               <AnimatePresence>
                 {showRejectBox && (
-                  <motion.div initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}
-                    style={{ overflow:'hidden', marginTop:'var(--sp-3)' }}>
+                  <motion.div initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }} style={{ overflow:'hidden', marginTop:'var(--sp-3)' }}>
                     <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
                       placeholder="Reason for rejection (required)…" rows={3}
                       style={{ width:'100%', padding:'10px 12px', border:'1.5px solid var(--ink-200)', borderRadius:10, fontSize:13, fontFamily:'var(--font-body)', resize:'vertical', outline:'none', boxSizing:'border-box', marginBottom:'var(--sp-2)' }} />
@@ -368,38 +342,27 @@ export default function AdminApplicationReview() {
                 <>
                   <CheckCircle size={40} strokeWidth={1.5} style={{ color:'var(--success-dark)', margin:'0 auto var(--sp-3)' }} />
                   <p style={{ fontSize:15, fontWeight:700, color:'var(--ink-900)', marginBottom:'var(--sp-4)' }}>Approved & Active</p>
-
-                  {/* Inline suspend confirmation — replaces window.confirm */}
-                  <AnimatePresence>
-                    {!showSuspendBox ? (
-                      <motion.button key="suspend-btn"
-                        onClick={() => setShowSuspendBox(true)} disabled={submitting}
-                        style={{ width:'100%', padding:'10px', background:'var(--warning-light)', color:'#92400E', border:'1px solid #FDE68A', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>
-                        Suspend Pharmacy
-                      </motion.button>
-                    ) : (
-                      <motion.div key="suspend-confirm"
-                        initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:4 }}
-                        style={{ background:'#FFF7ED', border:'1px solid #FED7AA', borderRadius:10, padding:'var(--sp-4)', textAlign:'left' }}>
-                        <p style={{ fontSize:13, fontWeight:600, color:'#92400E', marginBottom:'var(--sp-2)' }}>
-                          Suspend {app.name}?
-                        </p>
-                        <p style={{ fontSize:12, color:'#78350F', marginBottom:'var(--sp-3)', lineHeight:1.5 }}>
-                          Their listings will be hidden from consumers and no new orders can be placed.
-                        </p>
-                        <div style={{ display:'flex', gap:'var(--sp-2)' }}>
-                          <button onClick={() => setShowSuspendBox(false)}
-                            style={{ flex:1, padding:'8px', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', color:'var(--ink-700)' }}>
-                            Cancel
-                          </button>
-                          <button onClick={handleSuspend} disabled={submitting}
-                            style={{ flex:1, padding:'8px', background:'#D97706', border:'none', borderRadius:8, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)', color:'#FFF', opacity: submitting ? 0.7 : 1 }}>
-                            {submitting ? 'Suspending…' : 'Yes, Suspend'}
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {!showSuspendBox ? (
+                    <button onClick={() => setShowSuspendBox(true)} disabled={submitting}
+                      style={{ width:'100%', padding:'10px', background:'var(--warning-light)', color:'#92400E', border:'1px solid #FDE68A', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>
+                      Suspend Pharmacy
+                    </button>
+                  ) : (
+                    <div style={{ background:'#FFF7ED', border:'1px solid #FED7AA', borderRadius:10, padding:'var(--sp-4)', textAlign:'left' }}>
+                      <p style={{ fontSize:13, fontWeight:600, color:'#92400E', marginBottom:'var(--sp-2)' }}>Suspend {app.name}?</p>
+                      <p style={{ fontSize:12, color:'#78350F', marginBottom:'var(--sp-3)', lineHeight:1.5 }}>Listings will be hidden from consumers and no new orders can be placed.</p>
+                      <div style={{ display:'flex', gap:'var(--sp-2)' }}>
+                        <button onClick={() => setShowSuspendBox(false)}
+                          style={{ flex:1, padding:'8px', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', color:'var(--ink-700)' }}>
+                          Cancel
+                        </button>
+                        <button onClick={handleSuspend} disabled={submitting}
+                          style={{ flex:1, padding:'8px', background:'#D97706', border:'none', borderRadius:8, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)', color:'#FFF', opacity:submitting?0.7:1 }}>
+                          {submitting ? 'Suspending…' : 'Yes, Suspend'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
               {app.status === 'suspended' && (
@@ -408,8 +371,8 @@ export default function AdminApplicationReview() {
                   <p style={{ fontSize:15, fontWeight:700, color:'var(--ink-900)', marginBottom:8 }}>Suspended</p>
                   <p style={{ fontSize:13, color:'var(--ink-500)', marginBottom:'var(--sp-4)' }}>This pharmacy is hidden from consumers.</p>
                   <button onClick={handleReactivate} disabled={submitting}
-                    style={{ width:'100%', padding:'10px', background:'var(--success-light)', color:'var(--success-dark)', border:'1px solid #6EE7B7', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>
-                    Reactivate Pharmacy
+                    style={{ width:'100%', padding:'10px', background:'var(--success-light)', color:'var(--success-dark)', border:'1px solid #6EE7B7', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', opacity:submitting?0.7:1 }}>
+                    {submitting ? 'Reactivating…' : 'Reactivate Pharmacy'}
                   </button>
                 </>
               )}

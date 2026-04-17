@@ -16,15 +16,24 @@ const quickCategories = [
   { label:'Allergy',     emoji:'🌿', q:'Antihistamine' },
 ];
 
+const CITY_KEY = 'medmarket_city';
+
+function getSavedCity() {
+  try { return sessionStorage.getItem(CITY_KEY) || ''; } catch { return ''; }
+}
+
 export default function ConsumerHome() {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
   usePageTitle('Find Medicines Near You');
 
-  const { user }                   = useAuthStore();
-  const userCity                   = user?.city || '';
+  const { user } = useAuthStore();
+  
+  const [cityInput, setCityInput]     = useState(getSavedCity);
+  const [activeCity, setActiveCity]   = useState(getSavedCity);
+
   const { medicines: popularMeds } = useMedicines('', '');
-  const { stores: nearbyStores }   = useStores(userCity);
+  const { stores: nearbyStores }   = useStores(activeCity);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -34,19 +43,41 @@ export default function ConsumerHome() {
     navigate(path);
   };
 
+  const applyCity = (e) => {
+    e.preventDefault();
+    const city = cityInput.trim();
+    setActiveCity(city);
+    try { sessionStorage.setItem(CITY_KEY, city); } catch {}
+  };
+
   return (
     <div className={styles.page}>
       <motion.div className={styles.heroSection}
         initial={{ opacity:0, y:24 }} animate={{ opacity:1, y:0 }}
         transition={{ type:'spring', stiffness:260, damping:22 }}>
 
+        {/* City selector */}
+        <form onSubmit={applyCity} className={styles.cityForm} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:'var(--sp-3)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--white)', border:'1.5px solid var(--green-200)', borderRadius:'var(--r-full)', padding:'5px 14px 5px 10px', fontSize:13 }}>
+            <MapPin size={13} strokeWidth={2.5} style={{ color:'var(--green-700)', flexShrink:0 }} />
+            <input
+              value={cityInput}
+              onChange={e => setCityInput(e.target.value)}
+              placeholder="Enter your city…"
+              style={{ border:'none', outline:'none', fontSize:13, fontFamily:'var(--font-body)', background:'transparent', width:130, color:'var(--ink-900)' }}
+            />
+          </div>
+          <button type="submit"
+            style={{ fontSize:12, fontWeight:700, color:'var(--green-700)', background:'var(--green-50)', border:'1px solid var(--green-200)', borderRadius:'var(--r-full)', padding:'5px 14px', cursor:'pointer', fontFamily:'var(--font-body)', whiteSpace:'nowrap' }}>
+            {activeCity ? 'Update' : 'Find stores'}
+          </button>
+        </form>
+
         <div className={styles.locationPill}>
           <MapPin size={12} strokeWidth={2.5} />
-          {userCity
-            ? `${nearbyStores.length} store${nearbyStores.length !== 1 ? 's' : ''} in ${userCity}`
-            : nearbyStores.length > 0
-              ? `${nearbyStores.length} verified stores available`
-              : 'Loading stores...'
+          {activeCity
+            ? `${nearbyStores.length} store${nearbyStores.length !== 1 ? 's' : ''} in ${activeCity}`
+            : 'Enter your city to find stores near you'
           }
         </div>
 
@@ -81,10 +112,10 @@ export default function ConsumerHome() {
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>
               <Store size={18} strokeWidth={1.8} style={{ color:'var(--green-700)' }} />
-              Verified stores near you
+              Verified stores{activeCity ? ` in ${activeCity}` : ' near you'}
             </h2>
             <button className={styles.viewAllBtn} onClick={() => navigate('/consumer/stores')}>
-              View on map <ArrowRight size={13} strokeWidth={2} />
+              View all <ArrowRight size={13} strokeWidth={2} />
             </button>
           </div>
           <div className={styles.storesGrid}>
@@ -111,6 +142,15 @@ export default function ConsumerHome() {
               </motion.div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* No stores found message */}
+      {activeCity && nearbyStores.length === 0 && (
+        <div style={{ textAlign:'center', padding:'var(--sp-8)', color:'var(--ink-400)', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16 }}>
+          <Store size={36} strokeWidth={1} style={{ margin:'0 auto var(--sp-3)', display:'block' }} />
+          <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>No stores found in {activeCity}</p>
+          <p style={{ fontSize:13 }}>Try a nearby city or check your spelling.</p>
         </div>
       )}
 
@@ -143,7 +183,6 @@ export default function ConsumerHome() {
         </div>
       )}
 
-      {/* Quick access */}
       <motion.div className={styles.quickAccess}
         initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.35 }}>
         <div className={`${styles.quickCard} ${styles.quickCardDark}`} onClick={() => navigate('/consumer/orders')}>

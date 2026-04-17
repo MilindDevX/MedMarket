@@ -1,11 +1,16 @@
 import type { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../config/prisma.ts';
-import { uploadToCloudinary, deleteFromCloudinary } from '../lib/cloudinary.ts';
+import { cloudinary, uploadToCloudinary, deleteFromCloudinary } from '../lib/cloudinary.ts';
 import { successResponse, errorResponse } from '../utils/response.ts';
 
 const VALID_DOC_TYPES = ['drug_license', 'gst_certificate', 'aadhaar', 'pan', 'store_photo'] as const;
 type DocType = typeof VALID_DOC_TYPES[number];
+
+function docUrl(s3_key: string, mime_type: string): string {
+  const resourceType = mime_type === 'application/pdf' ? 'raw' : 'image';
+  return cloudinary.url(s3_key, { resource_type: resourceType, secure: true });
+}
 
 export async function uploadDocument(req: Request, res: Response) {
   try {
@@ -35,36 +40,26 @@ export async function uploadDocument(req: Request, res: Response) {
 
     let doc;
     if (existing) {
-      // Delete old file from Cloudinary before replacing
       if (existing.s3_key) {
         await deleteFromCloudinary(existing.s3_key, existing.mime_type).catch(() => {});
       }
       doc = await prisma.storeDocument.update({
         where: { id: existing.id },
-        data: {
-          s3_key:            public_id,
-          original_filename: req.file.originalname,
-          mime_type:         req.file.mimetype,
-        },
+        data: { s3_key: public_id, original_filename: req.file.originalname, mime_type: req.file.mimetype },
       });
     } else {
       doc = await prisma.storeDocument.create({
         data: {
-          store_id:          store.id,
+          store_id: store.id,
           doc_type,
-          s3_key:            public_id,
+          s3_key: public_id,
           original_filename: req.file.originalname,
-          mime_type:         req.file.mimetype,
+          mime_type: req.file.mimetype,
         },
       });
     }
 
-    return successResponse(
-      res,
-      { ...doc, url: secure_url },
-      'Document uploaded successfully',
-      201,
-    );
+    return successResponse(res, { ...doc, url: secure_url }, 'Document uploaded successfully', 201);
   } catch (err: any) {
     console.error('Document upload error:', err);
     if (err.message?.includes('Only PDF')) return errorResponse(res, err.message, 400);
@@ -75,21 +70,15 @@ export async function uploadDocument(req: Request, res: Response) {
 export async function getDocumentUrl(req: Request, res: Response) {
   try {
     const { id } = req.params;
-
     const doc = await prisma.storeDocument.findUnique({ where: { id } });
     if (!doc) return errorResponse(res, 'Document not found.', 404);
 
     const store   = await prisma.pharmacyStore.findFirst({ where: { owner_id: req.userId } });
     const isAdmin = req.role === 'admin';
     const isOwner = store?.id === doc.store_id;
-
     if (!isAdmin && !isOwner) return errorResponse(res, 'Access denied.', 403);
 
-    const { v2: cloudinary } = await import('cloudinary');
-    const resourceType = doc.mime_type === 'application/pdf' ? 'raw' : 'image';
-    const url = cloudinary.url(doc.s3_key, { resource_type: resourceType, secure: true });
-
-    return successResponse(res, { url }, 'Document URL fetched');
+    return successResponse(res, { url: docUrl(doc.s3_key, doc.mime_type) }, 'Document URL fetched');
   } catch {
     return errorResponse(res, 'Something went wrong.', 500);
   }
@@ -105,17 +94,11 @@ export async function listDocuments(req: Request, res: Response) {
       orderBy: { uploaded_at: 'desc' },
     });
 
-    // Attach Cloudinary URL to each document for direct preview
-    const { v2: cloudinary } = await import('cloudinary');
-    const docsWithUrls = docs.map(doc => {
-      const resourceType = doc.mime_type === 'application/pdf' ? 'raw' : 'image';
-      return {
-        ...doc,
-        url: cloudinary.url(doc.s3_key, { resource_type: resourceType, secure: true }),
-      };
-    });
-
-    return successResponse(res, docsWithUrls, 'Documents fetched');
+    return successResponse(
+      res,
+      docs.map(doc => ({ ...doc, url: docUrl(doc.s3_key, doc.mime_type) })),
+      'Documents fetched',
+    );
   } catch {
     return errorResponse(res, 'Something went wrong.', 500);
   }

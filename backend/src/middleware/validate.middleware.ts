@@ -71,7 +71,6 @@ export const addInventorySchema = z.object({
   low_stock_threshold: z.number().int().positive().optional(),
 });
 
-
 export const updateInventorySchema = z.object({
   quantity:            z.number().int().min(0).optional(),
   selling_price:       z.number().positive().optional(),

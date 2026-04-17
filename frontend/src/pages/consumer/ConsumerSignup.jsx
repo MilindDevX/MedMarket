@@ -8,21 +8,31 @@ import styles from './ConsumerSignup.module.css';
 
 const STEPS = ['Account', 'Personal', 'Location'];
 
-// Rejects disposable-looking emails: must have a real TLD (≥2 chars),
-// local part ≥2 chars, domain label ≥2 chars, no consecutive dots.
-function isRealEmail(email) {
-  return /^[a-zA-Z0-9._%+\-]{2,}@[a-zA-Z0-9.\-]{2,}\.[a-zA-Z]{2,}$/.test(email)
-    && !email.includes('..')
-    && email.split('@')[0].length >= 2
-    && email.split('@')[1].split('.')[0].length >= 2;
+// Real email validator — blocks t@t.com, a@b.c, etc.
+function isValidEmail(email) {
+  if (!email) return false;
+  // Must have a proper domain with at least 2-char TLD
+  const re = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  if (!re.test(email)) return false;
+  const [local, domain] = email.split('@');
+  // Local part must be at least 2 chars
+  if (local.length < 2) return false;
+  // Domain must have at least one dot and the part before the last dot must be >= 2 chars
+  const parts = domain.split('.');
+  if (parts.length < 2) return false;
+  if (parts[0].length < 2) return false;
+  // TLD must be at least 2 chars
+  if (parts[parts.length - 1].length < 2) return false;
+  return true;
 }
 
-// Rejects names that are only punctuation/symbols/whitespace or too short
-function isRealName(name) {
+// Name validator — blocks ".... .....", "____ ____", all-symbol names
+function isValidName(name) {
   const trimmed = name.trim();
   if (trimmed.length < 2) return false;
-  // Must contain at least 2 actual letters
-  return (trimmed.match(/[a-zA-Z\u0900-\u097F]/g) || []).length >= 2;
+  // Must contain at least 2 actual letters (not just symbols/spaces/dots/underscores)
+  const letterCount = (trimmed.match(/[a-zA-Z\u0900-\u097F]/g) || []).length;
+  return letterCount >= 2;
 }
 
 function Field({ label, id, type = 'text', value, onChange, error, placeholder, suffix }) {
@@ -30,9 +40,9 @@ function Field({ label, id, type = 'text', value, onChange, error, placeholder, 
     <div className={styles.field}>
       <label className={styles.label} htmlFor={id}>{label}</label>
       <div className={styles.inputWrap}>
-        <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)}
-          placeholder={placeholder} autoComplete={id}
-          className={`${styles.input} ${error ? styles.inputError : ''}`} />
+        <input id={id} type={type} value={value}
+          onChange={e => onChange(e.target.value)} placeholder={placeholder}
+          autoComplete={id} className={`${styles.input} ${error ? styles.inputError : ''}`} />
         {suffix}
       </div>
       {error && <span className={styles.fieldError}>{error}</span>}
@@ -47,26 +57,23 @@ export default function ConsumerSignup() {
 
   const [step,        setStep]        = useState(0);
   const [loading,     setLoading]     = useState(false);
-  const [showPassword,setShowPassword]= useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm,  setShowConfirm]  = useState(false);
   const [errors,      setErrors]      = useState({});
 
   const [form, setForm] = useState({
     email: '', password: '', confirm: '',
     name: '', mobile: '',
-    city: '', pincode: '', address: '',
+    city: '', pincode: '',
   });
 
-  const setField = (k, v) => {
-    setForm(f => ({ ...f, [k]: v }));
-    setErrors(e => ({ ...e, [k]: '', submit: '' }));
-  };
+  const setField = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: '' })); };
 
   const validate = () => {
     const errs = {};
     if (step === 0) {
-      if (!isRealEmail(form.email))
-        errs.email = 'Enter a valid email address (e.g. name@domain.com).';
+      if (!isValidEmail(form.email))
+        errs.email = 'Enter a valid email address (e.g. name@example.com).';
       if (form.password.length < 8)
         errs.password = 'Password must be at least 8 characters.';
       if (!/[A-Z]/.test(form.password))
@@ -77,8 +84,8 @@ export default function ConsumerSignup() {
         errs.confirm = 'Passwords do not match.';
     }
     if (step === 1) {
-      if (!isRealName(form.name))
-        errs.name = 'Enter your real full name (at least 2 letters).';
+      if (!isValidName(form.name))
+        errs.name = 'Enter a real name with at least 2 letters.';
       if (!form.mobile.match(/^[6-9]\d{9}$/))
         errs.mobile = 'Enter a valid 10-digit Indian mobile number.';
     }
@@ -108,13 +115,12 @@ export default function ConsumerSignup() {
       });
       navigate('/consumer/home');
     } catch (err) {
-      // Show error on the correct step
+      // Surface duplicate email and any other backend errors clearly
       const msg = err.message || '';
-      if (msg.toLowerCase().includes('email') || msg.includes('409') || msg.includes('already')) {
-        setStep(0);
-        setErrors({ submit: msg });
+      if (msg.toLowerCase().includes('already registered') || msg.includes('409')) {
+        setErrors({ submit: 'This email is already registered. Try signing in instead.' });
       } else {
-        setErrors({ submit: msg });
+        setErrors({ submit: msg || 'Registration failed. Please try again.' });
       }
     } finally {
       setLoading(false);
@@ -168,16 +174,6 @@ export default function ConsumerSignup() {
             ))}
           </div>
 
-          {/* Global submit error banner */}
-          <AnimatePresence>
-            {errors.submit && (
-              <motion.div initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
-                style={{ background:'var(--danger-light)', border:'1px solid #FECACA', borderRadius:8, padding:'10px 14px', fontSize:13, color:'var(--danger)', marginBottom:'var(--sp-3)', fontWeight:500 }}>
-                {errors.submit}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           <AnimatePresence mode="wait">
             {step === 0 && (
               <motion.div key="s0" initial={{ opacity:0, x:24 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-24 }} transition={{ type:'spring', stiffness:320, damping:28 }}>
@@ -186,7 +182,7 @@ export default function ConsumerSignup() {
                 <div className={styles.fields}>
                   <Field id="email" label="Email address" type="email"
                     value={form.email} onChange={v => setField('email', v)}
-                    placeholder="priya@example.com" error={errors.email} />
+                    placeholder="name@example.com" error={errors.email} />
                   <Field id="password" label="Password"
                     type={showPassword ? 'text' : 'password'}
                     value={form.password} onChange={v => setField('password', v)}
@@ -213,7 +209,6 @@ export default function ConsumerSignup() {
                     value={form.mobile} onChange={v => setField('mobile', v)}
                     placeholder="10-digit number, e.g. 9876543210" error={errors.mobile} />
                 </div>
-                <p className={styles.noteText}>Your mobile number will be shared with the pharmacy for delivery coordination.</p>
               </motion.div>
             )}
 
@@ -224,14 +219,16 @@ export default function ConsumerSignup() {
                 <div className={styles.fields}>
                   <Field id="city" label="City"
                     value={form.city} onChange={v => setField('city', v)}
-                    placeholder="e.g. Sonipat" error={errors.city} />
+                    placeholder="e.g. Sonipat, Delhi, Mumbai" error={errors.city} />
                   <Field id="pincode" label="PIN code" type="tel"
                     value={form.pincode} onChange={v => setField('pincode', v)}
                     placeholder="6-digit PIN, e.g. 131001" error={errors.pincode} />
-                  <Field id="address" label="Default address (optional)"
-                    value={form.address} onChange={v => setField('address', v)}
-                    placeholder="Street, Landmark" />
                 </div>
+                {errors.submit && (
+                  <div style={{ background:'var(--danger-light)', border:'1px solid #FECACA', borderRadius:8, padding:'10px 14px', fontSize:13, color:'var(--danger)', marginTop:'var(--sp-3)' }}>
+                    {errors.submit}
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

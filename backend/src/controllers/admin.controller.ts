@@ -5,7 +5,11 @@ import { createNotification } from "./notification.controller.ts";
 import { cloudinary } from "../lib/cloudinary.ts";
 
 export async function listUsers(req: Request, res: Response) {
-  const users = await prisma.user.findMany({ where: { role: 'consumer' }, select: { id:true, name:true, email:true, mobile:true, is_active:true, created_at:true, _count: { select: { orders:true } } }, orderBy: { created_at: 'desc' } });
+  const users = await prisma.user.findMany({
+    where: { role: 'consumer' },
+    select: { id:true, name:true, email:true, mobile:true, is_active:true, created_at:true, _count: { select: { orders:true } } },
+    orderBy: { created_at: 'desc' },
+  });
   return successResponse(res, users, 'Users fetched');
 }
 
@@ -21,7 +25,11 @@ export async function listApplications(req: Request, res: Response) {
   try {
     const { status } = req.query;
     const statusParam = typeof status === "string" ? status : undefined;
-    const stores = await prisma.pharmacyStore.findMany({ where: statusParam ? { status: statusParam as any } : undefined, include: { owner: { select: { id:true, name:true, email:true, mobile:true } } }, orderBy: { created_at: "desc" } });
+    const stores = await prisma.pharmacyStore.findMany({
+      where: statusParam ? { status: statusParam as any } : undefined,
+      include: { owner: { select: { id:true, name:true, email:true, mobile:true } } },
+      orderBy: { created_at: "desc" },
+    });
     return successResponse(res, stores, "Applications fetched successfully");
   } catch { return errorResponse(res, "Something went wrong", 500); }
 }
@@ -29,10 +37,12 @@ export async function listApplications(req: Request, res: Response) {
 export async function getApplication(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
-    const store = await prisma.pharmacyStore.findUnique({ where: { id }, include: { owner: { select: { id:true, name:true, email:true, mobile:true } }, documents: true } });
+    const store = await prisma.pharmacyStore.findUnique({
+      where: { id },
+      include: { owner: { select: { id:true, name:true, email:true, mobile:true } }, documents: true },
+    });
     if (!store) return errorResponse(res, "Application not found", 404);
 
-    // Attach Cloudinary URL to each document so admin can view/download
     const docsWithUrls = (store.documents || []).map(doc => {
       const resourceType = doc.mime_type === 'application/pdf' ? 'raw' : 'image';
       const url = doc.s3_key
@@ -52,9 +62,31 @@ export async function approveApplication(req: Request, res: Response) {
     if (!store) return errorResponse(res, "Application not found", 404);
     if (store.status !== "pending") return errorResponse(res, "Only pending applications can be approved", 400);
 
-    const updated = await prisma.pharmacyStore.update({ where: { id }, data: { status: "approved", verified_at: new Date(), verified_by: req.userId } });
-    await createNotification(store.owner_id, "store.approved", "Your pharmacy has been approved! 🎉", `Congratulations! ${store.name} has been verified and is now live on MedMarket. You can start listing medicines.`);
+    const updated = await prisma.pharmacyStore.update({
+      where: { id },
+      data: { status: "approved", verified_at: new Date(), verified_by: req.userId },
+    });
+    await createNotification(store.owner_id, "store.approved", "Your pharmacy has been approved! 🎉",
+      `Congratulations! ${store.name} has been verified and is now live on MedMarket.`);
     return successResponse(res, updated, "Application approved successfully");
+  } catch { return errorResponse(res, "Something went wrong", 500); }
+}
+
+// Separate from approveApplication — allows suspended → approved without the pending check
+export async function reactivateApplication(req: Request, res: Response) {
+  try {
+    const id    = req.params.id as string;
+    const store = await prisma.pharmacyStore.findUnique({ where: { id } });
+    if (!store) return errorResponse(res, "Application not found", 404);
+    if (store.status !== "suspended") return errorResponse(res, "Only suspended pharmacies can be reactivated", 400);
+
+    const updated = await prisma.pharmacyStore.update({
+      where: { id },
+      data: { status: "approved" },
+    });
+    await createNotification(store.owner_id, "store.approved", "Your pharmacy has been reactivated",
+      `Great news! ${store.name} is back online and visible to consumers.`);
+    return successResponse(res, updated, "Pharmacy reactivated successfully");
   } catch { return errorResponse(res, "Something went wrong", 500); }
 }
 
@@ -69,7 +101,8 @@ export async function rejectApplicaton(req: Request, res: Response) {
     if (store.status !== "pending") return errorResponse(res, "Only pending applications can be rejected", 400);
 
     const updated = await prisma.pharmacyStore.update({ where: { id }, data: { status: "rejected", rejection_reason } });
-    await createNotification(store.owner_id, "store.rejected", "Application not approved", `Your application for ${store.name} was not approved. Reason: ${rejection_reason}. You may resubmit with corrected documents.`);
+    await createNotification(store.owner_id, "store.rejected", "Application not approved",
+      `Your application for ${store.name} was not approved. Reason: ${rejection_reason}. You may resubmit with corrected documents.`);
     return successResponse(res, updated, "Application rejected");
   } catch { return errorResponse(res, "Something went wrong", 500); }
 }
@@ -81,7 +114,8 @@ export async function suspendApplication(req: Request, res: Response) {
     if (!store) return errorResponse(res, "Store not found", 404);
 
     const updated = await prisma.pharmacyStore.update({ where: { id }, data: { status: 'suspended' } });
-    await createNotification(store.owner_id, "store.suspended", "Your store has been suspended", `${store.name} has been suspended by MedMarket. All listings are hidden. Contact pharmacy-support@medmarket.in to resolve this.`);
+    await createNotification(store.owner_id, "store.suspended", "Your store has been suspended",
+      `${store.name} has been suspended. Contact pharmacy-support@medmarket.in to resolve this.`);
     return successResponse(res, updated, 'Pharmacy suspended');
   } catch { return errorResponse(res, "Something went wrong", 500); }
 }
@@ -96,7 +130,7 @@ export async function updatePharmacyDetails(req: Request, res: Response) {
 
     if (drug_license_no && drug_license_no !== store.drug_license_no) {
       const conflict = await prisma.pharmacyStore.findFirst({ where: { drug_license_no, id: { not: id } } });
-      if (conflict) return errorResponse(res, "Drug license number already in use by another store.", 409);
+      if (conflict) return errorResponse(res, "Drug license number already in use.", 409);
     }
 
     const updated = await prisma.pharmacyStore.update({
@@ -119,18 +153,31 @@ export async function updatePharmacyDetails(req: Request, res: Response) {
 }
 
 export async function getAllOrders(req: Request, res: Response) {
-  const orders = await prisma.order.findMany({ include: { items:true, consumer: { select: { id:true, name:true, mobile:true } }, store: { select: { id:true, name:true, city:true } } }, orderBy: { created_at: 'desc' } });
+  const orders = await prisma.order.findMany({
+    include: {
+      items: true,
+      consumer: { select: { id:true, name:true, mobile:true } },
+      store:    { select: { id:true, name:true, city:true } },
+    },
+    orderBy: { created_at: 'desc' },
+  });
   return successResponse(res, orders, 'Orders fetched');
 }
 
 export async function listComplaints(req: Request, res: Response) {
-  const complaints = await prisma.complaint.findMany({ include: { consumer: { select: { id:true, name:true, email:true, mobile:true } } }, orderBy: { created_at: 'desc' } });
+  const complaints = await prisma.complaint.findMany({
+    include: { consumer: { select: { id:true, name:true, email:true, mobile:true } } },
+    orderBy: { created_at: 'desc' },
+  });
   return res.json({ success: true, data: complaints });
 }
 
 export async function updateComplaint(req: Request, res: Response) {
   const id  = req.params.id as string;
   const { status, resolution } = req.body;
-  const updated = await prisma.complaint.update({ where: { id }, data: { ...(status && { status }), ...(resolution && { resolution }) } });
+  const updated = await prisma.complaint.update({
+    where: { id },
+    data: { ...(status && { status }), ...(resolution && { resolution }) },
+  });
   return res.json({ success: true, data: updated, message: 'Complaint updated' });
 }

@@ -20,7 +20,7 @@ export function useNotifications() {
     // Optimistic update
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
     try { await api.patch(`/notifications/${id}/read`, {}); }
-    catch { fetch(); }
+    catch { fetch(); } // revert on error
   }, [fetch]);
 
   const markAllRead = useCallback(async () => {

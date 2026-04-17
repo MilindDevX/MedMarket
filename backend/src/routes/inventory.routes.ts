@@ -15,6 +15,7 @@ import {
 
 const router = Router();
 
+// All inventory routes require an authenticated, approved pharmacy owner.
 router.get("/expiry-alerts", authenticate, requireRole("pharmacy_owner"), getExpiryAlerts);
 router.get("/",              authenticate, requireRole("pharmacy_owner"), getInventory);
 router.post("/",             authenticate, requireRole("pharmacy_owner"), validate(addInventorySchema), addInventory);

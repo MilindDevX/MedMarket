@@ -27,9 +27,9 @@ async function refreshAccessToken() {
   if (!refreshToken) return null;
   try {
     const res = await fetch(`${BASE_URL}/auth/refresh`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
+      body:    JSON.stringify({ refreshToken }),
     });
     if (!res.ok) { clearTokens(); return null; }
     const data = await res.json();
@@ -41,19 +41,26 @@ async function refreshAccessToken() {
   }
 }
 
+// Auth endpoints must never trigger the 401-refresh retry — a 401 on /auth/login
+// means wrong password, not an expired token.
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/refresh'];
+
 async function request(endpoint, options = {}) {
   const { accessToken } = getTokens();
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-  let res = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
+  const res  = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
   const data = await res.json().catch(() => ({ message: 'Server returned an unexpected response.' }));
 
   if (res.status === 403) {
-    throw new Error(data.message || 'Access denied. You do not have permission for this action.');
+    throw new Error(data.message || 'Access denied.');
   }
 
   if (res.status === 401) {
+    if (AUTH_ENDPOINTS.some(e => endpoint.startsWith(e))) {
+      throw new Error(data.message || 'Invalid credentials.');
+    }
     const msg = (data.message || '').toLowerCase();
     if (msg.includes('deactivat') || msg.includes('disabled') || msg.includes('inactive')) {
       throw new Error(data.message);
@@ -72,7 +79,11 @@ async function request(endpoint, options = {}) {
   }
 
   if (res.status === 404) {
-    throw new Error(data.message || `Endpoint not found: ${endpoint}.`);
+    throw new Error(data.message || `Not found: ${endpoint}.`);
+  }
+
+  if (res.status === 409) {
+    throw new Error(data.message || 'Already exists.');
   }
 
   if (!res.ok) throw new Error(data.message || 'Something went wrong');
