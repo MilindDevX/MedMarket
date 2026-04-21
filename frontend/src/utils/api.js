@@ -58,6 +58,7 @@ async function request(endpoint, options = {}) {
   }
 
   if (res.status === 401) {
+    // Never retry auth endpoints — wrong password IS a 401, not a stale token
     if (AUTH_ENDPOINTS.some(e => endpoint.startsWith(e))) {
       throw new Error(data.message || 'Invalid credentials.');
     }

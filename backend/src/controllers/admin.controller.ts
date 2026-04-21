@@ -5,20 +5,30 @@ import { createNotification } from "./notification.controller.ts";
 import { cloudinary } from "../lib/cloudinary.ts";
 
 export async function listUsers(req: Request, res: Response) {
-  const users = await prisma.user.findMany({
-    where: { role: 'consumer' },
-    select: { id:true, name:true, email:true, mobile:true, is_active:true, created_at:true, _count: { select: { orders:true } } },
-    orderBy: { created_at: 'desc' },
-  });
-  return successResponse(res, users, 'Users fetched');
+  try {
+    const users = await prisma.user.findMany({
+      where: { role: 'consumer' },
+      select: { id:true, name:true, email:true, mobile:true, is_active:true, created_at:true, _count: { select: { orders:true } } },
+      orderBy: { created_at: 'desc' },
+    });
+    return successResponse(res, users, 'Users fetched');
+  } catch (err) {
+    console.error('listUsers error:', err);
+    return errorResponse(res, 'Something went wrong', 500);
+  }
 }
 
 export async function toggleUserActive(req: Request, res: Response) {
-  const id   = req.params.id as string;
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) return errorResponse(res, 'User not found', 404);
-  const updated = await prisma.user.update({ where: { id }, data: { is_active: !user.is_active } });
-  return successResponse(res, updated, 'User status updated');
+  try {
+    const id   = req.params.id as string;
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) return errorResponse(res, 'User not found', 404);
+    const updated = await prisma.user.update({ where: { id }, data: { is_active: !user.is_active } });
+    return successResponse(res, updated, 'User status updated');
+  } catch (err) {
+    console.error('toggleUserActive error:', err);
+    return errorResponse(res, 'Something went wrong', 500);
+  }
 }
 
 export async function listApplications(req: Request, res: Response) {
@@ -153,31 +163,48 @@ export async function updatePharmacyDetails(req: Request, res: Response) {
 }
 
 export async function getAllOrders(req: Request, res: Response) {
-  const orders = await prisma.order.findMany({
-    include: {
-      items: true,
-      consumer: { select: { id:true, name:true, mobile:true } },
-      store:    { select: { id:true, name:true, city:true } },
-    },
-    orderBy: { created_at: 'desc' },
-  });
-  return successResponse(res, orders, 'Orders fetched');
+  try {
+    const orders = await prisma.order.findMany({
+      include: {
+        items: true,
+        consumer: { select: { id:true, name:true, mobile:true } },
+        store:    { select: { id:true, name:true, city:true } },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    return successResponse(res, orders, 'Orders fetched');
+  } catch (err) {
+    console.error('getAllOrders error:', err);
+    return errorResponse(res, 'Something went wrong', 500);
+  }
 }
 
 export async function listComplaints(req: Request, res: Response) {
-  const complaints = await prisma.complaint.findMany({
-    include: { consumer: { select: { id:true, name:true, email:true, mobile:true } } },
-    orderBy: { created_at: 'desc' },
-  });
-  return res.json({ success: true, data: complaints });
+  try {
+    const complaints = await prisma.complaint.findMany({
+      include: { consumer: { select: { id:true, name:true, email:true, mobile:true } } },
+      orderBy: { created_at: 'desc' },
+    });
+    return successResponse(res, complaints, 'Complaints fetched');
+  } catch (err) {
+    console.error('listComplaints error:', err);
+    return errorResponse(res, 'Something went wrong', 500);
+  }
 }
 
 export async function updateComplaint(req: Request, res: Response) {
-  const id  = req.params.id as string;
-  const { status, resolution } = req.body;
-  const updated = await prisma.complaint.update({
-    where: { id },
-    data: { ...(status && { status }), ...(resolution && { resolution }) },
-  });
-  return res.json({ success: true, data: updated, message: 'Complaint updated' });
+  try {
+    const id  = req.params.id as string;
+    const { status, resolution } = req.body;
+    const existing = await prisma.complaint.findUnique({ where: { id } });
+    if (!existing) return errorResponse(res, 'Complaint not found', 404);
+    const updated = await prisma.complaint.update({
+      where: { id },
+      data: { ...(status && { status }), ...(resolution && { resolution }) },
+    });
+    return successResponse(res, updated, 'Complaint updated');
+  } catch (err) {
+    console.error('updateComplaint error:', err);
+    return errorResponse(res, 'Something went wrong', 500);
+  }
 }

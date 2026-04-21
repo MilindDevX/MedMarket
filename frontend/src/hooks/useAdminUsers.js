@@ -11,6 +11,7 @@ export function useAdminUsers() {
     api.get('/admin/users')
       .then(res => { setUsers(res.data); setError(null); })
       .catch(err => {
+        // Endpoint may not exist yet — set empty array, not an error
         setUsers([]);
         setError(err.message);
       })

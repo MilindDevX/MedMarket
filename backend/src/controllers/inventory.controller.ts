@@ -97,7 +97,21 @@ export async function getInventory(req: Request, res: Response) {
       orderBy: { exp_date: "asc" },
     });
 
-    return successResponse(res, inventory, "Inventory fetched successfully");
+    // Compute total active stock per medicine across ALL batches in this store.
+    // This prevents a batch showing "Low Stock" when other batches have plenty.
+    const medicineTotals: Record<string, number> = {};
+    for (const item of inventory) {
+      if (item.status === "active") {
+        medicineTotals[item.medicine_id] = (medicineTotals[item.medicine_id] || 0) + item.quantity;
+      }
+    }
+
+    const enriched = inventory.map(item => ({
+      ...item,
+      medicine_total_quantity: medicineTotals[item.medicine_id] ?? item.quantity,
+    }));
+
+    return successResponse(res, enriched, "Inventory fetched successfully");
   } catch (error) {
     return errorResponse(res, "Something went wrong", 500);
   }

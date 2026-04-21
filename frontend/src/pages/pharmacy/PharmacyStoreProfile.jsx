@@ -14,7 +14,7 @@ const Field = ({ label, value, onChange, placeholder, type = 'text', readonly })
       style={{ height:42, padding:'0 14px', border:`1.5px solid ${readonly ? 'var(--ink-100)' : 'var(--ink-200)'}`, borderRadius:'var(--r-md)', fontSize:14, fontFamily:'var(--font-body)', outline:'none', background: readonly ? 'var(--ink-50)' : 'var(--white)', color: readonly ? 'var(--ink-400)' : 'var(--ink-900)', transition:'border-color 0.15s' }}
       onFocus={e => { if (!readonly) e.target.style.borderColor = 'var(--green-600)'; }}
       onBlur={e => e.target.style.borderColor = readonly ? 'var(--ink-100)' : 'var(--ink-200)'} />
-
+    
   </div>
 );
 
@@ -43,6 +43,8 @@ export default function PharmacyStoreProfile() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // PATCH /pharmacy/me — make sure backend has this route
+      // If not, add to admin.routes: router.patch('/pharmacy/me', authenticate, updateMyStore)
       await api.patch('/pharmacy/me', { phone, email, address_line: address, city, pincode });
       toast.success('Store profile updated successfully.');
       if (refetch) refetch();

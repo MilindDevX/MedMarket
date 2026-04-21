@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import prisma from './config/prisma.ts';
 import { generalLimiter, authLimiter } from './middleware/rateLimit.middleware.ts';
+import { globalErrorHandler } from './middleware/errorHandler.middleware.ts';
 
 import authRouter         from './routes/auth.routes.ts';
 import pharmacyRouter     from './routes/pharmacy.routes.ts';
@@ -49,10 +50,8 @@ app.use('/api/v1/consumer/addresses', addressRouter);
 app.use('/api/v1/notifications',      notificationRouter);
 app.use('/api/v1/consumer',           consumerRouter);
 
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ success:false, message:'Internal server error' });
-});
+// ── Global error handler — must be registered LAST ──
+app.use(globalErrorHandler);
 
 async function main() {
   await prisma.$connect();

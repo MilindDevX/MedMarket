@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, MapPin, LogOut, Pill, Store, Menu, X, ClipboardList, Bell } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import useCartStore from '../../store/cartStore';
+import useLocationStore from '../../store/locationStore';
 import styles from './ConsumerNav.module.css';
 
 const navLinks = [
@@ -19,6 +20,7 @@ export default function ConsumerNav() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const cartCount = useCartStore(s => s.items.reduce((sum, i) => sum + i.qty, 0));
+  const city = useLocationStore(s => s.city);
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -32,7 +34,7 @@ export default function ConsumerNav() {
 
         <div className={styles.location}>
           <MapPin size={12} strokeWidth={2} />
-          <span>Sonipat, HR</span>
+          <span>{city || 'Set location'}</span>
         </div>
 
         <nav className={styles.links}>

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, ShieldCheck, Star, MapPin, ArrowRight, Pill, Store, ChevronRight, Zap } from 'lucide-react';
+import { Search, ShieldCheck, Star, MapPin, ArrowRight, Pill, Store, ChevronRight, Zap, LocateFixed, Loader } from 'lucide-react';
 import usePageTitle from '../../utils/usePageTitle';
-import useAuthStore from '../../store/authStore';
+import useLocationStore from '../../store/locationStore';
 import { useMedicines } from '../../hooks/useMedicines';
 import { useStores } from '../../hooks/useStores';
 import styles from './ConsumerHome.module.css';
@@ -11,29 +11,21 @@ import styles from './ConsumerHome.module.css';
 const quickCategories = [
   { label:'Pain Relief', emoji:'💊', q:'Pain Relief' },
   { label:'Antacids',    emoji:'🫙', q:'Antacid' },
-  { label:'Vitamins',    emoji:'⚡', q:'Vitamins & Supplements' },
+  { label:'Vitamins',    emoji:'⚡', q:'Vitamins' },
   { label:'Hydration',   emoji:'💧', q:'Hydration' },
-  { label:'Allergy',     emoji:'🌿', q:'Antihistamine' },
+  { label:'Allergy',     emoji:'🌿', q:'Allergy' },
 ];
-
-const CITY_KEY = 'medmarket_city';
-
-function getSavedCity() {
-  try { return sessionStorage.getItem(CITY_KEY) || ''; } catch { return ''; }
-}
 
 export default function ConsumerHome() {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
   usePageTitle('Find Medicines Near You');
 
-  const { user } = useAuthStore();
-  
-  const [cityInput, setCityInput]     = useState(getSavedCity);
-  const [activeCity, setActiveCity]   = useState(getSavedCity);
+  const { city, detecting, error: locationError, setCity, detectLocation } = useLocationStore();
+  const [cityInput, setCityInput] = useState(city);
 
   const { medicines: popularMeds } = useMedicines('', '');
-  const { stores: nearbyStores }   = useStores(activeCity);
+  const { stores: nearbyStores }   = useStores(city);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -45,10 +37,19 @@ export default function ConsumerHome() {
 
   const applyCity = (e) => {
     e.preventDefault();
-    const city = cityInput.trim();
-    setActiveCity(city);
-    try { sessionStorage.setItem(CITY_KEY, city); } catch {}
+    setCity(cityInput.trim());
   };
+
+  const handleDetect = () => {
+    detectLocation();
+    // Sync input when detection completes (via store subscription would need useEffect)
+  };
+
+  // Keep input in sync when GPS sets city
+  const storeCity = useLocationStore(s => s.city);
+  if (cityInput !== storeCity && storeCity && !detecting) {
+    setCityInput(storeCity);
+  }
 
   return (
     <div className={styles.page}>
@@ -56,28 +57,50 @@ export default function ConsumerHome() {
         initial={{ opacity:0, y:24 }} animate={{ opacity:1, y:0 }}
         transition={{ type:'spring', stiffness:260, damping:22 }}>
 
-        {/* City selector */}
-        <form onSubmit={applyCity} className={styles.cityForm} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:'var(--sp-3)' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--white)', border:'1.5px solid var(--green-200)', borderRadius:'var(--r-full)', padding:'5px 14px 5px 10px', fontSize:13 }}>
-            <MapPin size={13} strokeWidth={2.5} style={{ color:'var(--green-700)', flexShrink:0 }} />
-            <input
-              value={cityInput}
-              onChange={e => setCityInput(e.target.value)}
-              placeholder="Enter your city…"
-              style={{ border:'none', outline:'none', fontSize:13, fontFamily:'var(--font-body)', background:'transparent', width:130, color:'var(--ink-900)' }}
-            />
-          </div>
-          <button type="submit"
-            style={{ fontSize:12, fontWeight:700, color:'var(--green-700)', background:'var(--green-50)', border:'1px solid var(--green-200)', borderRadius:'var(--r-full)', padding:'5px 14px', cursor:'pointer', fontFamily:'var(--font-body)', whiteSpace:'nowrap' }}>
-            {activeCity ? 'Update' : 'Find stores'}
+        {/* Location row */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:'var(--sp-3)', flexWrap:'wrap' }}>
+          {/* City text input */}
+          <form onSubmit={applyCity} style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:220 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--white)', border:'1.5px solid var(--green-200)', borderRadius:'var(--r-full)', padding:'5px 14px 5px 10px', fontSize:13, flex:1 }}>
+              <MapPin size={13} strokeWidth={2.5} style={{ color:'var(--green-700)', flexShrink:0 }} />
+              <input
+                value={cityInput}
+                onChange={e => setCityInput(e.target.value)}
+                placeholder="Enter your city…"
+                style={{ border:'none', outline:'none', fontSize:13, fontFamily:'var(--font-body)', background:'transparent', minWidth:0, flex:1, color:'var(--ink-900)' }}
+              />
+            </div>
+            <button type="submit"
+              style={{ fontSize:12, fontWeight:700, color:'var(--green-700)', background:'var(--green-50)', border:'1px solid var(--green-200)', borderRadius:'var(--r-full)', padding:'5px 14px', cursor:'pointer', fontFamily:'var(--font-body)', whiteSpace:'nowrap' }}>
+              {city ? 'Update' : 'Search'}
+            </button>
+          </form>
+
+          {/* GPS detect button */}
+          <button
+            onClick={handleDetect}
+            disabled={detecting}
+            title="Use my current location"
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', background: detecting ? 'var(--ink-100)' : 'var(--white)', border:'1.5px solid var(--green-200)', borderRadius:'var(--r-full)', fontSize:12, fontWeight:700, color:'var(--green-700)', cursor: detecting ? 'not-allowed' : 'pointer', whiteSpace:'nowrap', fontFamily:'var(--font-body)' }}>
+            {detecting
+              ? <><Loader size={13} strokeWidth={2.5} style={{ animation:'spin 0.8s linear infinite' }} /> Detecting…</>
+              : <><LocateFixed size={13} strokeWidth={2.5} /> Use my location</>
+            }
           </button>
-        </form>
+        </div>
+
+        {/* Location error */}
+        {locationError && (
+          <div style={{ fontSize:12, color:'var(--warning-dark)', background:'var(--warning-light)', border:'1px solid #FDE68A', borderRadius:8, padding:'6px 12px', marginBottom:'var(--sp-3)' }}>
+            {locationError}
+          </div>
+        )}
 
         <div className={styles.locationPill}>
           <MapPin size={12} strokeWidth={2.5} />
-          {activeCity
-            ? `${nearbyStores.length} store${nearbyStores.length !== 1 ? 's' : ''} in ${activeCity}`
-            : 'Enter your city to find stores near you'
+          {city
+            ? `${nearbyStores.length} store${nearbyStores.length !== 1 ? 's' : ''} in ${city}`
+            : 'Enter your city or tap "Use my location"'
           }
         </div>
 
@@ -112,7 +135,7 @@ export default function ConsumerHome() {
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>
               <Store size={18} strokeWidth={1.8} style={{ color:'var(--green-700)' }} />
-              Verified stores{activeCity ? ` in ${activeCity}` : ' near you'}
+              Verified stores{city ? ` in ${city}` : ' near you'}
             </h2>
             <button className={styles.viewAllBtn} onClick={() => navigate('/consumer/stores')}>
               View all <ArrowRight size={13} strokeWidth={2} />
@@ -145,11 +168,10 @@ export default function ConsumerHome() {
         </div>
       )}
 
-      {/* No stores found message */}
-      {activeCity && nearbyStores.length === 0 && (
+      {city && nearbyStores.length === 0 && !detecting && (
         <div style={{ textAlign:'center', padding:'var(--sp-8)', color:'var(--ink-400)', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16 }}>
           <Store size={36} strokeWidth={1} style={{ margin:'0 auto var(--sp-3)', display:'block' }} />
-          <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>No stores found in {activeCity}</p>
+          <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>No stores found in {city}</p>
           <p style={{ fontSize:13 }}>Try a nearby city or check your spelling.</p>
         </div>
       )}
@@ -202,6 +224,8 @@ export default function ConsumerHome() {
           <ArrowRight size={16} strokeWidth={2} style={{ color:'var(--green-300)' }} />
         </div>
       </motion.div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

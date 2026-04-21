@@ -437,3 +437,19 @@ model Complaint {
   created_at  DateTime @default(now())
   consumer    User     @relation(fields: [consumer_id], references: [id])
 }
+
+model PlatformSettings {
+  id                      String   @id @default("singleton")
+  gst_rate                Decimal  @default(12)
+  delivery_fee            Decimal  @default(30)
+  free_delivery_threshold Decimal  @default(200)
+  cod_limit               Decimal  @default(2000)
+  order_timeout_minutes   Int      @default(30)
+  expiry_warn_60          Boolean  @default(true)
+  expiry_warn_30          Boolean  @default(true)
+  dead_stock_alert        Boolean  @default(true)
+  email_invoice           Boolean  @default(true)
+  sms_on_order            Boolean  @default(true)
+  updated_at              DateTime @updatedAt
+  updated_by              String?
+}

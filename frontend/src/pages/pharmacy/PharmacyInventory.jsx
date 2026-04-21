@@ -16,7 +16,10 @@ const getStatus = (item) => {
   if (daysLeft < 0)  return 'expired';
   if (daysLeft < 30) return 'expiring-critical';
   if (daysLeft < 60) return 'expiring-soon';
-  if (item.quantity < item.low_stock_threshold) return 'low';
+  // Use medicine-level total (all active batches) for low stock check.
+  // A batch with 0 qty is NOT low stock if other batches of the same medicine have plenty.
+  const totalQty = item.medicine_total_quantity ?? item.quantity;
+  if (totalQty < item.low_stock_threshold) return 'low';
   return 'ok';
 };
 

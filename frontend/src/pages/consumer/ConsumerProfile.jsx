@@ -5,6 +5,7 @@ import { User, MapPin, Phone, Mail, Plus, Edit2, X, Check, Trash2, MessageSquare
 import useAuthStore from '../../store/authStore';
 import useToastStore from '../../store/toastStore';
 import { useAddresses } from '../../hooks/useAddresses';
+import { useOrders } from '../../hooks/useOrders';
 import { api } from '../../utils/api';
 import styles from './ConsumerProfile.module.css';
 
@@ -13,6 +14,7 @@ export default function ConsumerProfile() {
   const { user } = useAuthStore();
   const toast    = useToastStore();
   const { addresses, loading: addrLoading, add, update, remove, setDefault } = useAddresses();
+  const { orders } = useOrders();
 
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showAddAddress,  setShowAddAddress]  = useState(false);
@@ -26,32 +28,47 @@ export default function ConsumerProfile() {
   // Complaint state
   const [showComplaintForm, setShowComplaintForm] = useState(false);
   const [complaintType,     setComplaintType]     = useState('');
+  const [otherReason,       setOtherReason]       = useState('');
   const [complaintSubject,  setComplaintSubject]  = useState('');
   const [complaintBody,     setComplaintBody]     = useState('');
-  const [complaintOrderId,  setComplaintOrderId]  = useState('');
+  const [selectedOrderId,   setSelectedOrderId]   = useState('');
   const [filingComplaint,   setFilingComplaint]   = useState(false);
+
+  // Auto-fill subject when type changes
+  const typeLabels = {
+    wrong_medicine: 'Wrong Medicine Delivered',
+    expired_medicine: 'Expired Medicine Received',
+    overcharged: 'Overcharged / Above MRP',
+    late_delivery: 'Late Delivery',
+    store_behavior: 'Store Behaviour Issue',
+    other: '',
+  };
+
+  const handleTypeChange = (t) => {
+    setComplaintType(t);
+    if (t !== 'other') setComplaintSubject(typeLabels[t] || '');
+    else setComplaintSubject('');
+    setOtherReason('');
+  };
+
   const handleFileComplaint = async () => {
-    if (!complaintType)          { toast.error('Please select a complaint type.'); return; }
-    if (!complaintSubject.trim()){ toast.error('Subject is required.'); return; }
-    if (!complaintBody.trim())   { toast.error('Please describe the issue.'); return; }
+    if (!complaintType)                           { toast.error('Please select a complaint type.'); return; }
+    if (complaintType === 'other' && !otherReason.trim()) { toast.error('Please describe the reason for "Other".'); return; }
+    if (!complaintSubject.trim())                 { toast.error('Subject is required.'); return; }
+    if (!complaintBody.trim())                    { toast.error('Please describe the issue.'); return; }
     setFilingComplaint(true);
     try {
       await api.post('/consumer/complaints', {
-        type:      complaintType,
-        subject:   complaintSubject,
-        body:      complaintBody,
-        order_id:  complaintOrderId || null,
+        type:     complaintType,
+        subject:  complaintType === 'other' ? otherReason.trim() : complaintSubject,
+        body:     complaintBody,
+        order_id: selectedOrderId || null,
       });
       toast.success('Complaint filed. Our team will review it within 24 hours.');
       setShowComplaintForm(false);
-      setComplaintType(''); setComplaintSubject(''); setComplaintBody(''); setComplaintOrderId('');
+      setComplaintType(''); setOtherReason(''); setComplaintSubject(''); setComplaintBody(''); setSelectedOrderId('');
     } catch (err) {
-      const msg = err.message || '';
-      if (msg.includes('404') || msg.includes('not found') || msg.includes('unexpected')) {
-        toast.error('Backend endpoint POST /api/v1/consumer/complaints not yet implemented. See BACKEND_FIXES.md #13.');
-      } else {
-        toast.error(msg || 'Failed to file complaint.');
-      }
+      toast.error(err.message || 'Failed to file complaint.');
     } finally {
       setFilingComplaint(false);
     }
@@ -241,27 +258,54 @@ export default function ConsumerProfile() {
               <div style={{ padding:'var(--sp-5)', display:'flex', flexDirection:'column', gap:'var(--sp-4)' }}>
                 <div>
                   <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Complaint Type *</label>
-                  <select value={complaintType} onChange={e => setComplaintType(e.target.value)}
+                  <select value={complaintType} onChange={e => handleTypeChange(e.target.value)}
                     style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', background:'var(--white)' }}>
                     <option value="">Select type…</option>
                     <option value="wrong_medicine">Wrong Medicine Delivered</option>
-                    <option value="expired_medicine">Expired Medicine</option>
+                    <option value="expired_medicine">Expired Medicine Received</option>
                     <option value="overcharged">Overcharged / Above MRP</option>
                     <option value="late_delivery">Late Delivery</option>
                     <option value="store_behavior">Store Behaviour</option>
                     <option value="other">Other</option>
                   </select>
                 </div>
+
+                {/* Other reason — only shown when type is "other" */}
+                {complaintType === 'other' && (
+                  <div>
+                    <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Please specify the reason *</label>
+                    <input value={otherReason} onChange={e => setOtherReason(e.target.value)}
+                      placeholder="Briefly describe your issue…"
+                      style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', boxSizing:'border-box' }} />
+                  </div>
+                )}
+
+                {/* Order dropdown — populated from real orders */}
                 <div>
-                  <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Order ID (optional)</label>
-                  <input value={complaintOrderId} onChange={e => setComplaintOrderId(e.target.value)} placeholder="e.g. #4F3A1B2C"
-                    style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', boxSizing:'border-box' }} />
+                  <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>
+                    Related Order <span style={{ fontWeight:400, color:'var(--ink-400)' }}>(optional)</span>
+                  </label>
+                  <select value={selectedOrderId} onChange={e => setSelectedOrderId(e.target.value)}
+                    style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color: selectedOrderId ? 'var(--ink-900)' : 'var(--ink-400)', background:'var(--white)' }}>
+                    <option value="">Not related to a specific order</option>
+                    {orders.map(o => (
+                      <option key={o.id} value={o.id}>
+                        #{o.id.slice(0,8).toUpperCase()} · {o.store?.name || 'Store'} · ₹{Number(o.total_amount).toFixed(0)} · {o.status}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div>
-                  <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Subject *</label>
-                  <input value={complaintSubject} onChange={e => setComplaintSubject(e.target.value)} placeholder="Brief description of the issue"
-                    style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', boxSizing:'border-box' }} />
-                </div>
+
+                {/* Subject — auto-filled, editable */}
+                {complaintType && complaintType !== 'other' && (
+                  <div>
+                    <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Subject *</label>
+                    <input value={complaintSubject} onChange={e => setComplaintSubject(e.target.value)}
+                      placeholder="Brief description of the issue"
+                      style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', boxSizing:'border-box' }} />
+                  </div>
+                )}
+
                 <div>
                   <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Details *</label>
                   <textarea value={complaintBody} onChange={e => setComplaintBody(e.target.value)}

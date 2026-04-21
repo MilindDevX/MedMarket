@@ -33,6 +33,7 @@ export default function AdminUsers() {
         `${u.name}'s account ${!u.is_active ? 'reactivated' : 'deactivated'}.`
       );
     } catch {
+      // Backend endpoint may not exist yet — show informative message
       toast.error('User management API not yet implemented. Add GET/PATCH /admin/users to the backend.');
     }
   };

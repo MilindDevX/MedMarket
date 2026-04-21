@@ -11,7 +11,7 @@ const STEPS = ['Account', 'Personal', 'Location'];
 // Rejects disposable-looking emails: must have a real TLD (≥2 chars),
 // local part ≥2 chars, domain label ≥2 chars, no consecutive dots.
 function isRealEmail(email) {
-  return /^[a-zA-Z0-9._%+\-]{2,}@[a-zA-Z0-9.\-]{2,}\.[a-zA-Z]{2,}$/.test(email)
+  return /^[a-zA-Z0-9._%+-]{2,}@[a-zA-Z0-9.-]{2,}\.[a-zA-Z]{2,}$/.test(email)
     && !email.includes('..')
     && email.split('@')[0].length >= 2
     && email.split('@')[1].split('.')[0].length >= 2;
@@ -22,7 +22,7 @@ function isRealName(name) {
   const trimmed = name.trim();
   if (trimmed.length < 2) return false;
   // Must contain at least 2 actual letters
-  return (trimmed.match(/[a-zA-Z\u0900-\u097F]/g) || []).length >= 2;
+  return (trimmed.match(/\p{L}/gu) || []).length >= 2;
 }
 
 function Field({ label, id, type = 'text', value, onChange, error, placeholder, suffix }) {

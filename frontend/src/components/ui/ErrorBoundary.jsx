@@ -14,6 +14,7 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     this.setState({ errorInfo });
+    // In production, send to error reporting service
     console.error('ErrorBoundary caught:', error, errorInfo);
   }
 

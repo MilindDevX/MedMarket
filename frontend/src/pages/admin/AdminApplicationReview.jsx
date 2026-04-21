@@ -1,5 +1,5 @@
 import usePageTitle from '../../utils/usePageTitle';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -48,7 +48,7 @@ export default function AdminApplicationReview() {
   const [editData,    setEditData]    = useState({});
   const [savingEdit,  setSavingEdit]  = useState(false);
 
-  const fetchApp = async () => {
+  const fetchApp = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get(`/admin/applications/${id}`);
@@ -58,9 +58,10 @@ export default function AdminApplicationReview() {
     } finally {
       setLoading(false);
     }
-  };
+  // toast is a stable Zustand store reference — omitting it is intentional
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { fetchApp(); }, [id]);
+  useEffect(() => { fetchApp(); }, [fetchApp]);
 
   const allChecked = verifyChecks.every(c => checked[c.id]);
   const toggle     = (cid) => setChecked(p => ({ ...p, [cid]: !p[cid] }));

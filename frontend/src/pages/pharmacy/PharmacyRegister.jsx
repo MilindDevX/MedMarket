@@ -41,7 +41,7 @@ function isRealEmail(email) {
 function isRealName(name) {
   const trimmed = (name || '').trim();
   if (trimmed.length < 2) return false;
-  return (trimmed.match(/[a-zA-Z\u0900-\u097F]/g) || []).length >= 2;
+  return (trimmed.match(/\p{L}/gu) || []).length >= 2;
 }
 
 const initialData = {

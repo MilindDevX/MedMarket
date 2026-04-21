@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 
-const useOrderStore = create((set, get) => ({
+// Minimal in-memory store used only by Checkout to surface the placed order ID
+// immediately after POST /orders without waiting for a refetch.
+// MyOrders and OrderTracking always read from the real API via hooks.
+const useOrderStore = create((set, _get) => ({
   recentOrderId: null,
 
   addOrder: (order) => {

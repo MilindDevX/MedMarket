@@ -12,7 +12,7 @@ const STEPS = ['Account', 'Personal', 'Location'];
 function isValidEmail(email) {
   if (!email) return false;
   // Must have a proper domain with at least 2-char TLD
-  const re = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!re.test(email)) return false;
   const [local, domain] = email.split('@');
   // Local part must be at least 2 chars
@@ -31,7 +31,7 @@ function isValidName(name) {
   const trimmed = name.trim();
   if (trimmed.length < 2) return false;
   // Must contain at least 2 actual letters (not just symbols/spaces/dots/underscores)
-  const letterCount = (trimmed.match(/[a-zA-Z\u0900-\u097F]/g) || []).length;
+  const letterCount = (trimmed.match(/\p{L}/gu) || []).length;
   return letterCount >= 2;
 }
 
@@ -92,7 +92,7 @@ export default function ConsumerSignup() {
     if (step === 2) {
       if (!form.city.trim())
         errs.city = 'City is required.';
-      if (!form.pincode.match(/^\d{6}$/))
+      if (!form.pincode.match(/^[a-zA-Z0-9._%+-]{6}$/))
         errs.pincode = 'Enter a valid 6-digit PIN code.';
     }
     setErrors(errs);
