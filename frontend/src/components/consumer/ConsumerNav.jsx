@@ -5,13 +5,14 @@ import { ShoppingCart, MapPin, LogOut, Pill, Store, Menu, X, ClipboardList, Bell
 import useAuthStore from '../../store/authStore';
 import useCartStore from '../../store/cartStore';
 import useLocationStore from '../../store/locationStore';
+import { useNotifications } from '../../hooks/useNotifications';
 import styles from './ConsumerNav.module.css';
 
 const navLinks = [
-  { to: '/consumer/stores',    label: 'Stores',    icon: Store },
-  { to: '/consumer/medicines', label: 'Medicines', icon: Pill },
-  { to: '/consumer/notifications', label: 'Alerts', icon: Bell },
-    { to: '/consumer/orders',    label: 'Orders',    icon: ClipboardList },
+  { to: '/consumer/stores',        label: 'Stores',        icon: Store },
+  { to: '/consumer/medicines',     label: 'Medicines',     icon: Pill },
+  { to: '/consumer/notifications', label: 'Notifications', icon: Bell },
+  { to: '/consumer/orders',        label: 'Orders',        icon: ClipboardList },
 ];
 
 export default function ConsumerNav() {
@@ -21,6 +22,7 @@ export default function ConsumerNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const cartCount = useCartStore(s => s.items.reduce((sum, i) => sum + i.qty, 0));
   const city = useLocationStore(s => s.city);
+  const { unreadCount } = useNotifications();
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -38,15 +40,28 @@ export default function ConsumerNav() {
         </div>
 
         <nav className={styles.links}>
-          {navLinks.map(({ to, label }) => (
-            <Link key={to} to={to}
-              className={`${styles.link} ${location.pathname.startsWith(to) ? styles.linkActive : ''}`}>
-              {label}
-            </Link>
-          ))}
+          {navLinks.map(({ to, label, icon: Icon }) => {
+            const isNotif = to.includes('notification');
+            return (
+              <Link key={to} to={to}
+                className={`${styles.link} ${location.pathname.startsWith(to) ? styles.linkActive : ''}`}
+                style={{ position:'relative', display:'inline-flex', alignItems:'center', gap:5 }}>
+                <span style={{ position:'relative', display:'inline-flex' }}>
+                  <Icon size={14} strokeWidth={2} />
+                  {isNotif && unreadCount > 0 && (
+                    <span style={{ position:'absolute', top:-5, right:-6, width:14, height:14, borderRadius:'50%', background:'var(--danger)', color:'#fff', fontSize:8, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </span>
+                {label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className={styles.right}>
+          {/* Cart badge */}
           <button className={styles.cartBtn} aria-label="View shopping cart" onClick={() => navigate('/consumer/cart')}>
             <ShoppingCart size={18} strokeWidth={2} />
             <AnimatePresence>

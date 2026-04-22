@@ -1,5 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 
+// Config is applied here at import time AND lazily before each operation
+// to handle cases where env vars are set after module initialization
 function applyConfig() {
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',

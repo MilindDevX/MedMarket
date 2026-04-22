@@ -1,16 +1,11 @@
 import usePageTitle from '../../utils/usePageTitle';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MapPin, ShieldCheck, Star, Map, Search, X } from 'lucide-react';
+import { MapPin, ShieldCheck, Star, LocateFixed, Loader, Search, X } from 'lucide-react';
 import { useStores } from '../../hooks/useStores';
+import useLocationStore from '../../store/locationStore';
 import styles from './ConsumerStores.module.css';
-
-const CITY_KEY = 'medmarket_city';
-
-function getSavedCity() {
-  try { return sessionStorage.getItem(CITY_KEY) || ''; } catch { return ''; }
-}
 
 export default function ConsumerStores() {
   usePageTitle('Nearby Stores');
@@ -21,115 +16,117 @@ export default function ConsumerStores() {
   const medicineFilter = searchParams.get('medicine') || '';
   const stateMessage   = location.state?.message || '';
 
-  const [cityInput,  setCityInput]  = useState(getSavedCity);
-  const [activeCity, setActiveCity] = useState(getSavedCity);
+  // Read from the shared locationStore — same source as home tab and navbar
+  const { city: storeCity, detecting, error: locationError, setCity, detectLocation, clear } = useLocationStore();
 
-  const { stores, loading, error } = useStores(activeCity);
+  // Local input mirrors the store city; changes only commit on form submit
+  const [cityInput, setCityInput] = useState(storeCity);
+  useEffect(() => { setCityInput(storeCity); }, [storeCity]);
+
+  const { stores, loading, error } = useStores(storeCity);
 
   const applyCity = (e) => {
     e.preventDefault();
-    const city = cityInput.trim();
-    setActiveCity(city);
-    try { sessionStorage.setItem(CITY_KEY, city); } catch {}
+    const trimmed = cityInput.trim();
+    if (trimmed) setCity(trimmed);
   };
 
   const clearCity = () => {
+    clear();
     setCityInput('');
-    setActiveCity('');
-    try { sessionStorage.removeItem(CITY_KEY); } catch {}
   };
 
   return (
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>
-          {activeCity ? `Pharmacies in ${activeCity}` : 'Stores near you'}
+          {storeCity ? `Pharmacies in ${storeCity}` : 'Stores near you'}
         </h1>
         <p className={styles.subtitle}>
-          {activeCity
+          {storeCity
             ? `${stores.length} verified pharmacy${stores.length !== 1 ? 's' : ''} found`
             : 'Enter your city to find verified pharmacies near you'}
         </p>
       </div>
 
-      {/* City search bar */}
-      <form onSubmit={applyCity} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:'var(--sp-4)' }}>
-        <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, background:'var(--white)', border:'1.5px solid var(--ink-200)', borderRadius:'var(--r-md)', padding:'0 14px', height:42 }}>
-          <MapPin size={15} strokeWidth={2.5} style={{ color:'var(--green-700)', flexShrink:0 }} />
-          <input
-            value={cityInput}
-            onChange={e => setCityInput(e.target.value)}
-            placeholder="Enter your city, e.g. Sonipat"
-            style={{ flex:1, border:'none', outline:'none', fontSize:14, fontFamily:'var(--font-body)', background:'transparent', color:'var(--ink-900)' }}
-          />
-          {cityInput && (
-            <button type="button" onClick={clearCity} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--ink-400)', display:'flex', padding:2 }}>
-              <X size={14} strokeWidth={2.5} />
-            </button>
-          )}
-        </div>
-        <button type="submit"
-          style={{ height:42, padding:'0 20px', background:'var(--green-700)', color:'#FFF', border:'none', borderRadius:'var(--r-md)', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:6 }}>
-          <Search size={14} strokeWidth={2.5} /> Search
-        </button>
-      </form>
+      {/* Location controls */}
+      <div style={{ display:'flex', gap:8, marginBottom:'var(--sp-4)', flexWrap:'wrap' }}>
+        <form onSubmit={applyCity} style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:220 }}>
+          <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, background:'var(--white)', border:'1.5px solid var(--ink-200)', borderRadius:'var(--r-md)', padding:'0 14px', height:42 }}>
+            <MapPin size={15} strokeWidth={2.5} style={{ color:'var(--green-700)', flexShrink:0 }} />
+            <input
+              value={cityInput}
+              onChange={e => setCityInput(e.target.value)}
+              placeholder="Enter your city, e.g. Pune"
+              style={{ flex:1, border:'none', outline:'none', fontSize:14, fontFamily:'var(--font-body)', background:'transparent', color:'var(--ink-900)', minWidth:0 }}
+            />
+            {cityInput && (
+              <button type="button" onClick={clearCity}
+                style={{ background:'none', border:'none', cursor:'pointer', color:'var(--ink-400)', display:'flex', padding:2, flexShrink:0 }}>
+                <X size={14} strokeWidth={2.5} />
+              </button>
+            )}
+          </div>
+          <button type="submit"
+            style={{ height:42, padding:'0 18px', background:'var(--green-700)', color:'#FFF', border:'none', borderRadius:'var(--r-md)', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+            <Search size={14} strokeWidth={2.5} /> Search
+          </button>
+        </form>
 
-      {/* Redirect message */}
+        <button onClick={detectLocation} disabled={detecting}
+          style={{ height:42, padding:'0 16px', background:'var(--white)', color:'var(--green-700)', border:'1.5px solid var(--green-200)', borderRadius:'var(--r-md)', fontSize:13, fontWeight:700, cursor: detecting ? 'not-allowed' : 'pointer', fontFamily:'var(--font-body)', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:6, opacity: detecting ? 0.7 : 1, flexShrink:0 }}>
+          {detecting
+            ? <><Loader size={13} strokeWidth={2.5} style={{ animation:'spin 0.8s linear infinite' }} /> Detecting…</>
+            : <><LocateFixed size={13} strokeWidth={2.5} /> Use my location</>}
+        </button>
+      </div>
+
+      {locationError && (
+        <div style={{ background:'var(--warning-light)', border:'1px solid #FDE68A', borderRadius:8, padding:'8px 14px', fontSize:13, color:'var(--warning-dark)', marginBottom:'var(--sp-3)' }}>
+          {locationError}
+        </div>
+      )}
+
       {stateMessage && (
         <div style={{ background:'var(--warning-light)', border:'1px solid #FDE68A', borderRadius:10, padding:'var(--sp-3) var(--sp-4)', fontSize:13, color:'#92400E', marginBottom:'var(--sp-4)', display:'flex', gap:8, alignItems:'flex-start' }}>
           <span>⚠</span><span>{stateMessage}</span>
         </div>
       )}
 
-      {/* Medicine filter banner */}
       {medicineFilter && (
         <div style={{ background:'var(--green-50)', border:'1px solid var(--green-200)', borderRadius:10, padding:'var(--sp-3) var(--sp-4)', fontSize:13, color:'var(--green-700)', marginBottom:'var(--sp-4)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <span>Showing stores that may carry <strong>{medicineFilter}</strong> — select a store to check stock.</span>
+          <span>Showing stores that may carry <strong>{medicineFilter}</strong></span>
           <button onClick={() => navigate('/consumer/stores')} style={{ fontSize:12, color:'var(--ink-400)', background:'none', border:'none', cursor:'pointer', flexShrink:0, marginLeft:8 }}>✕ Clear</button>
         </div>
       )}
 
-      {/* Map placeholder */}
-      <div className={styles.mapBox} role="img" aria-label="Map placeholder">
-        <div className={styles.mapGrid} />
-        <div className={styles.mapContent}>
-          <div className={styles.mapIcon}>
-            <Map size={22} strokeWidth={1.5} style={{ color:'var(--green-700)' }} />
-          </div>
-          <div className={styles.mapText}>Interactive map</div>
-          <div className={styles.mapSub}>Google Maps integration — configure VITE_GOOGLE_MAPS_KEY to enable</div>
-        </div>
-      </div>
-
       {loading && (
-        <div className={styles.sectionTitle}>Loading stores…</div>
+        <div style={{ textAlign:'center', padding:'var(--sp-8)', color:'var(--ink-400)', fontSize:14 }}>Loading stores…</div>
       )}
 
       {error && (
-        <div style={{ padding:'var(--sp-5)', color:'var(--danger)', textAlign:'center' }}>
-          Failed to load stores. Please try again.
-        </div>
+        <div style={{ padding:'var(--sp-5)', color:'var(--danger)', textAlign:'center' }}>Failed to load stores. Please try again.</div>
       )}
 
       {!loading && !error && (
         <>
-          {!activeCity ? (
+          {!storeCity ? (
             <div style={{ textAlign:'center', padding:'var(--sp-10)', color:'var(--ink-400)', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16 }}>
               <MapPin size={36} strokeWidth={1} style={{ margin:'0 auto var(--sp-3)', display:'block' }} />
-              <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>Enter your city above</p>
+              <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>Enter your city or tap "Use my location"</p>
               <p style={{ fontSize:13 }}>We'll show verified pharmacies in your area.</p>
             </div>
           ) : stores.length === 0 ? (
             <div style={{ textAlign:'center', padding:'var(--sp-10)', color:'var(--ink-400)', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16 }}>
               <MapPin size={36} strokeWidth={1} style={{ margin:'0 auto var(--sp-3)', display:'block' }} />
-              <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>No stores found in {activeCity}</p>
+              <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>No stores found in {storeCity}</p>
               <p style={{ fontSize:13 }}>Try a nearby city or check your spelling.</p>
             </div>
           ) : (
             <>
               <div className={styles.sectionTitle}>
                 <ShieldCheck size={18} strokeWidth={1.8} style={{ color:'var(--green-700)' }} />
-                {stores.length} verified {stores.length === 1 ? 'pharmacy' : 'pharmacies'} in {activeCity}
+                {stores.length} verified {stores.length === 1 ? 'pharmacy' : 'pharmacies'} in {storeCity}
               </div>
 
               <div className={styles.grid}>
@@ -163,6 +160,8 @@ export default function ConsumerStores() {
           )}
         </>
       )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

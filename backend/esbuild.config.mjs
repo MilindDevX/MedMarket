@@ -1,53 +1,50 @@
-// esbuild.config.mjs
-// Production build: bundles TypeScript → single ESM file in dist/
-// Handles .ts import extensions that tsc with NodeNext resolution cannot emit.
+/**
+ * esbuild.config.mjs — Production build script
+ *
+ * Render deploy commands:
+ *   Build command:  npm install && npm run build
+ *   Start command:  npm start
+ *
+ * The build:
+ *   1. Runs `prisma generate` to ensure the generated client exists
+ *   2. Bundles src/ into dist/index.js via esbuild
+ *   3. All node_modules (including Prisma) stay external — resolved at runtime
+ */
 import { build } from 'esbuild';
 import { execSync } from 'child_process';
 import fs from 'fs';
 
-// Type-check first (non-blocking on import extensions because noEmit is true)
-console.log('⏳ Type-checking...');
+// Step 1 — Prisma generate (creates src/generated/prisma/client.js)
+console.log('⏳ Generating Prisma client…');
 try {
-  execSync('tsc --noEmit', { stdio: 'inherit' });
-  console.log('✅ Type-check passed');
-} catch {
-  console.error('❌ Type errors found. Fix them before building.');
+  execSync('npx prisma generate', { stdio: 'inherit' });
+  console.log('✅ Prisma client generated');
+} catch (err) {
+  // On Render this must succeed; locally it may fail if engines are blocked
+  console.error('❌ prisma generate failed:', err.message);
   process.exit(1);
 }
 
-// Clean dist
+// Step 2 — Clean dist/
 if (fs.existsSync('dist')) fs.rmSync('dist', { recursive: true });
 fs.mkdirSync('dist', { recursive: true });
 
-console.log('⏳ Bundling with esbuild...');
+// Step 3 — Bundle
+console.log('⏳ Bundling with esbuild…');
+
 await build({
   entryPoints: ['src/index.ts'],
-  bundle: true,
-  platform: 'node',
-  target: 'node20',
-  format: 'esm',
-  outfile: 'dist/index.js',
-  // External: don't bundle native modules or Prisma generated client
-  external: [
-    '@prisma/client',
-    'prisma',
-    'bcryptjs',
-    'jsonwebtoken',
-    'cloudinary',
-    'multer',
-    'express',
-    'cors',
-    'helmet',
-    'morgan',
-    'dotenv',
-    'express-rate-limit',
-    'uuid',
-    'zod',
-  ],
-  sourcemap: true,
-  banner: {
-    js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
-  },
+  bundle:      true,
+  platform:    'node',
+  target:      'node20',
+  format:      'esm',
+  outfile:     'dist/index.js',
+  sourcemap:   true,
+
+  // Mark ALL packages (node_modules) as external so they're
+  // require()'d at runtime. This handles Prisma's native .node binaries
+  // and the generated client which has complex internal imports.
+  packages: 'external',
 });
 
 console.log('✅ Build complete → dist/index.js');

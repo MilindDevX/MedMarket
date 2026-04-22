@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, ShieldCheck, Star, MapPin, ArrowRight, Pill, Store, ChevronRight, Zap, LocateFixed, Loader } from 'lucide-react';
+import { Search, ShieldCheck, Star, MapPin, ArrowRight, Pill, Store, ChevronRight, Zap, LocateFixed, Loader, X } from 'lucide-react';
 import usePageTitle from '../../utils/usePageTitle';
 import useLocationStore from '../../store/locationStore';
 import { useMedicines } from '../../hooks/useMedicines';
@@ -21,8 +21,11 @@ export default function ConsumerHome() {
   const navigate = useNavigate();
   usePageTitle('Find Medicines Near You');
 
-  const { city, detecting, error: locationError, setCity, detectLocation } = useLocationStore();
+  const { city, detecting, error: locationError, setCity, detectLocation, clear } = useLocationStore();
+
+  // cityInput is only local display state — syncs from store whenever store.city changes
   const [cityInput, setCityInput] = useState(city);
+  useEffect(() => { setCityInput(city); }, [city]);
 
   const { medicines: popularMeds } = useMedicines('', '');
   const { stores: nearbyStores }   = useStores(city);
@@ -37,19 +40,14 @@ export default function ConsumerHome() {
 
   const applyCity = (e) => {
     e.preventDefault();
-    setCity(cityInput.trim());
+    const trimmed = cityInput.trim();
+    if (trimmed) setCity(trimmed);
   };
 
-  const handleDetect = () => {
-    detectLocation();
-    // Sync input when detection completes (via store subscription would need useEffect)
+  const handleClear = () => {
+    clear();
+    setCityInput('');
   };
-
-  // Keep input in sync when GPS sets city
-  const storeCity = useLocationStore(s => s.city);
-  if (cityInput !== storeCity && storeCity && !detecting) {
-    setCityInput(storeCity);
-  }
 
   return (
     <div className={styles.page}>
@@ -59,9 +57,9 @@ export default function ConsumerHome() {
 
         {/* Location row */}
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:'var(--sp-3)', flexWrap:'wrap' }}>
-          {/* City text input */}
+          {/* City text input + submit */}
           <form onSubmit={applyCity} style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:220 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--white)', border:'1.5px solid var(--green-200)', borderRadius:'var(--r-full)', padding:'5px 14px 5px 10px', fontSize:13, flex:1 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--white)', border:'1.5px solid var(--green-200)', borderRadius:'var(--r-full)', padding:'5px 10px', fontSize:13, flex:1 }}>
               <MapPin size={13} strokeWidth={2.5} style={{ color:'var(--green-700)', flexShrink:0 }} />
               <input
                 value={cityInput}
@@ -69,6 +67,13 @@ export default function ConsumerHome() {
                 placeholder="Enter your city…"
                 style={{ border:'none', outline:'none', fontSize:13, fontFamily:'var(--font-body)', background:'transparent', minWidth:0, flex:1, color:'var(--ink-900)' }}
               />
+              {/* Clear button — shown when a city is set */}
+              {city && (
+                <button type="button" onClick={handleClear}
+                  style={{ background:'none', border:'none', cursor:'pointer', color:'var(--ink-400)', display:'flex', padding:2, flexShrink:0 }}>
+                  <X size={13} strokeWidth={2.5} />
+                </button>
+              )}
             </div>
             <button type="submit"
               style={{ fontSize:12, fontWeight:700, color:'var(--green-700)', background:'var(--green-50)', border:'1px solid var(--green-200)', borderRadius:'var(--r-full)', padding:'5px 14px', cursor:'pointer', fontFamily:'var(--font-body)', whiteSpace:'nowrap' }}>
@@ -76,11 +81,11 @@ export default function ConsumerHome() {
             </button>
           </form>
 
-          {/* GPS detect button */}
+          {/* GPS detect button — always available so user can re-detect */}
           <button
-            onClick={handleDetect}
+            onClick={detectLocation}
             disabled={detecting}
-            title="Use my current location"
+            title="Detect my current location"
             style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', background: detecting ? 'var(--ink-100)' : 'var(--white)', border:'1.5px solid var(--green-200)', borderRadius:'var(--r-full)', fontSize:12, fontWeight:700, color:'var(--green-700)', cursor: detecting ? 'not-allowed' : 'pointer', whiteSpace:'nowrap', fontFamily:'var(--font-body)' }}>
             {detecting
               ? <><Loader size={13} strokeWidth={2.5} style={{ animation:'spin 0.8s linear infinite' }} /> Detecting…</>

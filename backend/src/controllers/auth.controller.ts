@@ -149,7 +149,7 @@ export async function refresh(req: Request, res: Response) {
     if (!user || !user.is_active) {
       return errorResponse(res, "User not found or deactivated", 401);
     }
-    
+
     await prisma.refreshToken.update({
       where: { id: stored.id },
       data: { revoked_at: new Date() },

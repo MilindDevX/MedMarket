@@ -1,3 +1,10 @@
+/**
+ * Auth controller — unit tests
+ *
+ * All Prisma calls are mocked so no database is required.
+ * We test the HTTP layer: correct status codes, response shapes,
+ * and business-logic branches (duplicate email, inactive account, etc.)
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response } from 'express';
 

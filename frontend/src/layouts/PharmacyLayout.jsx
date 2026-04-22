@@ -11,13 +11,14 @@ import { usePharmacyOrders } from '../hooks/usePharmacyOrders';
 import styles from './PharmacyLayout.module.css';
 
 const navItems = [
-  { to: '/pharmacy/dashboard',       icon: LayoutDashboard, label: 'Dashboard',    end: true },
-  { to: '/pharmacy/inventory',       icon: Package,         label: 'Inventory',    end: true },
-  { to: '/pharmacy/inventory/expiry',icon: AlertTriangle,   label: 'Expiry Alerts',end: false, indent: true },
-  { to: '/pharmacy/orders',          icon: ShoppingBag,     label: 'Orders',       end: false },
-  { to: '/pharmacy/analytics',       icon: BarChart2,       label: 'Analytics',    end: false },
-  { to: '/pharmacy/pricing',         icon: Tag,             label: 'Pricing',      end: false },
-  { to: '/pharmacy/profile',         icon: Store,           label: 'Store Profile',end: false },
+  { to: '/pharmacy/dashboard',       icon: LayoutDashboard, label: 'Dashboard',      end: true },
+  { to: '/pharmacy/inventory',       icon: Package,         label: 'Inventory',      end: true },
+  { to: '/pharmacy/inventory/expiry',icon: AlertTriangle,   label: 'Expiry Alerts',  end: false, indent: true },
+  { to: '/pharmacy/orders',          icon: ShoppingBag,     label: 'Orders',         end: false },
+  { to: '/pharmacy/analytics',       icon: BarChart2,       label: 'Analytics',      end: false },
+  { to: '/pharmacy/pricing',         icon: Tag,             label: 'Pricing',        end: false },
+  { to: '/pharmacy/notifications',   icon: Bell,            label: 'Notifications',  end: false },
+  { to: '/pharmacy/profile',         icon: Store,           label: 'Store Profile',  end: false },
 ];
 
 export default function PharmacyLayout() {

@@ -34,14 +34,48 @@ export default function ConsumerProfile() {
   const [selectedOrderId,   setSelectedOrderId]   = useState('');
   const [filingComplaint,   setFilingComplaint]   = useState(false);
 
-  // Auto-fill subject when type changes
-  const typeLabels = {
-    wrong_medicine: 'Wrong Medicine Delivered',
-    expired_medicine: 'Expired Medicine Received',
-    overcharged: 'Overcharged / Above MRP',
-    late_delivery: 'Late Delivery',
-    store_behavior: 'Store Behaviour Issue',
-    other: '',
+  // Complaint types and which order statuses they are valid for.
+  // null means "valid regardless of order / no order selected"
+  const complaintTypes = [
+    { value: 'wrong_medicine',   label: 'Wrong Medicine Delivered',  validFor: ['delivered'] },
+    { value: 'expired_medicine', label: 'Expired Medicine Received', validFor: ['delivered'] },
+    { value: 'overcharged',      label: 'Overcharged / Above MRP',   validFor: ['delivered', 'accepted', 'packing', 'dispatched'] },
+    { value: 'late_delivery',    label: 'Late Delivery',             validFor: ['delivered', 'dispatched'] },
+    { value: 'store_behavior',   label: 'Store Behaviour',           validFor: null },
+    { value: 'other',            label: 'Other',                     validFor: null },
+  ];
+
+  const typeLabels = Object.fromEntries(complaintTypes.map(t => [t.value, t.label]));
+
+  // Get the status of the currently selected order
+  const selectedOrder = orders.find(o => o.id === selectedOrderId);
+  const selectedOrderStatus = selectedOrder?.status || null;
+
+  // Filter types based on selected order status
+  const availableTypes = complaintTypes.filter(t => {
+    if (!selectedOrderId) return true;                 // no order selected → show all
+    if (!t.validFor) return true;                      // always valid
+    return t.validFor.includes(selectedOrderStatus);   // match status
+  });
+
+  // Only show orders that are meaningful to complain about (not pending/confirmed with no action yet)
+  const complaintableOrders = orders.filter(o =>
+    ['delivered', 'accepted', 'packing', 'dispatched', 'rejected'].includes(o.status)
+  );
+
+  const handleOrderChange = (orderId) => {
+    setSelectedOrderId(orderId);
+    // Reset type if it's no longer valid for the newly selected order
+    if (complaintType) {
+      const newOrder = orders.find(o => o.id === orderId);
+      const newStatus = newOrder?.status || null;
+      const typeStillValid = complaintTypes.find(t => t.value === complaintType);
+      if (typeStillValid?.validFor && newStatus && !typeStillValid.validFor.includes(newStatus)) {
+        setComplaintType('');
+        setComplaintSubject('');
+        setOtherReason('');
+      }
+    }
   };
 
   const handleTypeChange = (t) => {
@@ -52,10 +86,10 @@ export default function ConsumerProfile() {
   };
 
   const handleFileComplaint = async () => {
-    if (!complaintType)                           { toast.error('Please select a complaint type.'); return; }
-    if (complaintType === 'other' && !otherReason.trim()) { toast.error('Please describe the reason for "Other".'); return; }
-    if (!complaintSubject.trim())                 { toast.error('Subject is required.'); return; }
-    if (!complaintBody.trim())                    { toast.error('Please describe the issue.'); return; }
+    if (!complaintType)                                       { toast.error('Please select a complaint type.'); return; }
+    if (complaintType === 'other' && !otherReason.trim())     { toast.error('Please describe the reason for "Other".'); return; }
+    if (complaintType !== 'other' && !complaintSubject.trim()){ toast.error('Subject is required.'); return; }
+    if (!complaintBody.trim())                                { toast.error('Please describe the issue.'); return; }
     setFilingComplaint(true);
     try {
       await api.post('/consumer/complaints', {
@@ -256,21 +290,41 @@ export default function ConsumerProfile() {
                 <button onClick={() => setShowComplaintForm(false)} style={{ display:'flex', padding:4, color:'var(--ink-400)', borderRadius:6, background:'none', border:'none', cursor:'pointer' }}><X size={18} /></button>
               </div>
               <div style={{ padding:'var(--sp-5)', display:'flex', flexDirection:'column', gap:'var(--sp-4)' }}>
+
+                {/* Step 1 — Order (optional but drives type filter) */}
+                <div>
+                  <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>
+                    Related Order <span style={{ fontWeight:400, color:'var(--ink-400)' }}>(optional — select first to see relevant complaint types)</span>
+                  </label>
+                  <select value={selectedOrderId} onChange={e => handleOrderChange(e.target.value)}
+                    style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color: selectedOrderId ? 'var(--ink-900)' : 'var(--ink-400)', background:'var(--white)' }}>
+                    <option value="">Not related to a specific order</option>
+                    {complaintableOrders.map(o => (
+                      <option key={o.id} value={o.id}>
+                        #{o.id.slice(0,8).toUpperCase()} · {o.store?.name || 'Store'} · ₹{Number(o.total_amount).toFixed(0)} · {o.status}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedOrderStatus && (
+                    <div style={{ fontSize:11, color:'var(--ink-400)', marginTop:4 }}>
+                      Showing complaint types applicable to a <strong>{selectedOrderStatus}</strong> order.
+                    </div>
+                  )}
+                </div>
+
+                {/* Step 2 — Complaint type (filtered by order status) */}
                 <div>
                   <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Complaint Type *</label>
                   <select value={complaintType} onChange={e => handleTypeChange(e.target.value)}
                     style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', background:'var(--white)' }}>
                     <option value="">Select type…</option>
-                    <option value="wrong_medicine">Wrong Medicine Delivered</option>
-                    <option value="expired_medicine">Expired Medicine Received</option>
-                    <option value="overcharged">Overcharged / Above MRP</option>
-                    <option value="late_delivery">Late Delivery</option>
-                    <option value="store_behavior">Store Behaviour</option>
-                    <option value="other">Other</option>
+                    {availableTypes.map(t => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
                   </select>
                 </div>
 
-                {/* Other reason — only shown when type is "other" */}
+                {/* "Other" reason */}
                 {complaintType === 'other' && (
                   <div>
                     <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Please specify the reason *</label>
@@ -280,23 +334,7 @@ export default function ConsumerProfile() {
                   </div>
                 )}
 
-                {/* Order dropdown — populated from real orders */}
-                <div>
-                  <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>
-                    Related Order <span style={{ fontWeight:400, color:'var(--ink-400)' }}>(optional)</span>
-                  </label>
-                  <select value={selectedOrderId} onChange={e => setSelectedOrderId(e.target.value)}
-                    style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color: selectedOrderId ? 'var(--ink-900)' : 'var(--ink-400)', background:'var(--white)' }}>
-                    <option value="">Not related to a specific order</option>
-                    {orders.map(o => (
-                      <option key={o.id} value={o.id}>
-                        #{o.id.slice(0,8).toUpperCase()} · {o.store?.name || 'Store'} · ₹{Number(o.total_amount).toFixed(0)} · {o.status}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Subject — auto-filled, editable */}
+                {/* Auto-filled subject (editable) */}
                 {complaintType && complaintType !== 'other' && (
                   <div>
                     <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Subject *</label>
