@@ -16,6 +16,7 @@ import {
 
 const router = Router();
 
+
 // ── Consumer routes ──
 router.post("/",              authenticate, requireRole("consumer"), validate(placeOrderSchema), placeOrder);
 router.get("/my",             authenticate, requireRole("consumer"), getMyOrders);

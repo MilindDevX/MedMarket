@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -6,8 +6,7 @@ import {
   BarChart2, Tag, Store, Bell, LogOut, ChevronRight, Menu, X
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
-import { useInventory } from '../hooks/useInventory';
-import { usePharmacyOrders } from '../hooks/usePharmacyOrders';
+import { useNotifications } from '../hooks/useNotifications';
 import styles from './PharmacyLayout.module.css';
 
 const navItems = [
@@ -25,31 +24,7 @@ export default function PharmacyLayout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { inventory } = useInventory();
-  const { orders }    = usePharmacyOrders();
-
-  // Stable timestamp for notification count (updates every 60s)
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Live notification count — must match exactly what PharmacyNotifications page generates
-  const alertCount = useMemo(() => {
-    const expiring = inventory.filter(i => {
-      if (!i.exp_date) return false;
-      const d = Math.floor((new Date(i.exp_date) - now) / 86400000);
-      return d < 60;
-    }).length;
-    const lowStock = inventory.filter(i =>
-      i.quantity > 0 && i.quantity <= (i.low_stock_threshold || 10)
-    ).length;
-    const newOrders = orders.filter(o =>
-      o.status === 'confirmed' && (now - new Date(o.created_at).getTime()) < 48*3600*1000
-    ).length;
-    return expiring + lowStock + newOrders;
-  }, [inventory, orders, now]);
+  const { unreadCount } = useNotifications();
 
   const handleLogout = () => {
     logout();
@@ -111,7 +86,7 @@ export default function PharmacyLayout() {
               <Bell size={20} strokeWidth={1.8} className={styles.bell}
                 onClick={() => navigate('/pharmacy/notifications')}
                 style={{ cursor: 'pointer' }} />
-              {alertCount > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: 'var(--danger)', color: 'var(--always-white)', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-body)' }}>{alertCount > 9 ? '9+' : alertCount}</span>}
+              {unreadCount > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: 'var(--danger)', color: 'var(--always-white)', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-body)' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
             </div>
           </div>
         </div>

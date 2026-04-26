@@ -8,8 +8,16 @@ const VALID_DOC_TYPES = ['drug_license', 'gst_certificate', 'aadhaar', 'pan', 's
 type DocType = typeof VALID_DOC_TYPES[number];
 
 function docUrl(s3_key: string, mime_type: string): string {
-  const resourceType = mime_type === 'application/pdf' ? 'raw' : 'image';
-  return cloudinary.url(s3_key, { resource_type: resourceType, secure: true });
+  if (mime_type === 'application/pdf') {
+    // For PDFs stored as 'raw' resource type, generate a direct URL.
+    // Append fl_attachment:false is not needed for raw — just use direct URL.
+    return cloudinary.url(s3_key, {
+      resource_type: 'raw',
+      secure: true,
+      flags: 'attachment:false',
+    });
+  }
+  return cloudinary.url(s3_key, { resource_type: 'image', secure: true });
 }
 
 export async function uploadDocument(req: Request, res: Response) {

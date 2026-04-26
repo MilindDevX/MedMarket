@@ -10,14 +10,21 @@ export default function PublicNav() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
+  // Landing page has a dark hero — nav starts transparent with white text.
+  // All other public pages have a light background — nav always shows dark text.
+  const isLanding = pathname === '/';
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // On non-landing pages, behave as if always scrolled (white bg, dark text)
+  const showDark = !isLanding || scrolled;
+
   return (
-    <header className={`${styles.nav} ${scrolled ? styles.scrolled : ''}`}>
+    <header className={`${styles.nav} ${showDark ? styles.scrolled : ''}`}>
       <div className={styles.inner}>
         {/* Brand */}
         <Link to="/" className={styles.brand}>

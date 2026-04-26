@@ -25,11 +25,18 @@ export default function AdminMedicines() {
   const [editingId,   setEditingId]   = useState(null);
   const [form,        setForm]        = useState(emptyForm);
   const toast = useToastStore();
-  const { medicines, loading, create, update, deactivate } = useAdminMedicines(search, catFilter);
+  const { allMedicines, loading, create, update, deactivate } = useAdminMedicines();
 
-  const filtered = medicines.filter(m => {
+  const filtered = allMedicines.filter(m => {
+    const q = search.toLowerCase();
+    const matchSearch = !q ||
+      m.name?.toLowerCase().includes(q) ||
+      m.generic_name?.toLowerCase().includes(q) ||
+      m.salt_composition?.toLowerCase().includes(q) ||
+      m.manufacturer?.toLowerCase().includes(q);
+    const matchCat   = catFilter === 'All'  || m.category === catFilter;
     const matchSched = schedFilter === 'all' || m.schedule === schedFilter;
-    return matchSched;
+    return matchSearch && matchCat && matchSched;
   });
 
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -65,7 +72,7 @@ export default function AdminMedicines() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Medicine Database</h1>
-          <p className={styles.subtitle}>{medicines.length} medicines in the CDSCO-approved catalogue</p>
+          <p className={styles.subtitle}>{allMedicines.length} medicines in the CDSCO-approved catalogue</p>
         </div>
         <button className={styles.addBtn} onClick={openCreate}>
           <Plus size={14} strokeWidth={2.5} /> Add Medicine

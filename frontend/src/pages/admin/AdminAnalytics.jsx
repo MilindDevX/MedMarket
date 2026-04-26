@@ -12,6 +12,18 @@ import { useAdminOrders } from '../../hooks/useAdminOrders';
 import { useAdminUsers } from '../../hooks/useAdminUsers';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 
+const fmtMoney = (v) => {
+  const n = Number(v);
+  if (n >= 10000000) return `₹${(n/10000000).toFixed(2)}Cr`;
+  if (n >= 100000)   return `₹${(n/100000).toFixed(1)}L`;
+  if (n >= 1000)     return `₹${(n/1000).toFixed(1)}k`;
+  return `₹${Math.round(n)}`;
+};
+const fmtAxis = v => {
+  if (v >= 100000) return `₹${(v/100000).toFixed(0)}L`;
+  if (v >= 1000)   return `₹${(v/1000).toFixed(0)}k`;
+  return `₹${v}`;
+};
 const PIE_COLORS = ['#0C6B4E','#1A56DB','#8B5CF6','#F59E0B','#10B981','#EF4444'];
 const card      = { background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16, padding:'var(--sp-5)' };
 const cardTitle = { fontSize:16, fontWeight:700, color:'var(--ink-900)', letterSpacing:'-0.2px', marginBottom:'var(--sp-4)', display:'flex', alignItems:'center', gap:8 };
@@ -143,7 +155,7 @@ export default function AdminAnalytics() {
       {/* ── KPIs ── */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:'var(--sp-4)' }}>
         {[
-          { icon:TrendingUp,    label:'Total GMV',             val:`₹${(totalGmv/100000).toFixed(1)}L`,  color:'var(--green-700)' },
+          { icon:TrendingUp,    label:'Total GMV',             val:fmtMoney(totalGmv),           color:'var(--green-700)' },
           { icon:ShoppingCart,  label:'Total Orders',          val:totalOrders,                           color:'var(--blue-700)' },
           { icon:CheckCircle,   label:'Platform Fulfillment',  val:`${fulfillmentRate}%`,                 color:'var(--success-dark)' },
           { icon:Store,         label:'Active Stores',         val:approvedStores,                        color:'var(--green-700)' },
@@ -181,8 +193,8 @@ export default function AdminAnalytics() {
             <XAxis dataKey="day" tick={{ fontSize:11, fill:'var(--ink-400)' }} axisLine={false} tickLine={false}
               interval={Math.ceil(gmvByDay.length / 7) - 1} />
             <YAxis tick={{ fontSize:11, fill:'var(--ink-400)' }} axisLine={false} tickLine={false}
-              tickFormatter={v => v >= 1000 ? `₹${(v/1000).toFixed(1)}k` : `₹${v}`} />
-            <Tooltip formatter={v => [`₹${Number(v).toLocaleString('en-IN')}`, 'GMV']}
+              tickFormatter={fmtAxis} />
+            <Tooltip formatter={v => [fmtMoney(v), 'GMV']}
               contentStyle={{ background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:8, fontSize:13 }} />
             <Area type="monotone" dataKey="gmv" stroke="#0C6B4E" strokeWidth={2.5} fill="url(#gmvGrad)" />
           </AreaChart>
@@ -196,21 +208,38 @@ export default function AdminAnalytics() {
           {cityRanking.length === 0 ? (
             <div style={{ textAlign:'center', padding:'var(--sp-6)', color:'var(--ink-400)', fontSize:14 }}>No orders yet.</div>
           ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-3)' }}>
-              {cityRanking.map((c, i) => {
-                const max = cityRanking[0].orders;
-                return (
-                  <div key={c.city}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                      <span style={{ fontSize:13, fontWeight:600, color:'var(--ink-900)' }}>{c.city}</span>
-                      <span style={{ fontSize:12, color:'var(--ink-500)' }}>{c.orders} orders · ₹{Math.round(c.gmv/1000)}k</span>
-                    </div>
-                    <div style={{ height:5, background:'var(--ink-100)', borderRadius:9999 }}>
-                      <div style={{ height:5, background: PIE_COLORS[i % PIE_COLORS.length], borderRadius:9999, width:`${max > 0 ? (c.orders/max)*100 : 0}%`, transition:'width 0.6s ease' }} />
-                    </div>
-                  </div>
-                );
-              })}
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                <thead>
+                  <tr style={{ borderBottom:'1px solid var(--ink-200)' }}>
+                    {['#','City','Orders','GMV','Share'].map(h => (
+                      <th key={h} style={{ textAlign: h==='#'||h==='Orders'||h==='GMV'||h==='Share' ? 'right' : 'left', padding:'6px 8px', fontWeight:700, color:'var(--ink-400)', fontSize:11, textTransform:'uppercase', letterSpacing:'0.05em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {cityRanking.map((c, i) => {
+                    const maxOrders = cityRanking[0].orders;
+                    const shareWidth = maxOrders > 0 ? Math.round((c.orders / cityRanking.reduce((s,x) => s+x.orders, 0)) * 100) : 0;
+                    return (
+                      <tr key={c.city} style={{ borderBottom:'1px solid var(--ink-100)' }}>
+                        <td style={{ padding:'10px 8px', textAlign:'right', color:'var(--ink-400)', fontWeight:700, fontSize:12, width:28 }}>{i+1}</td>
+                        <td style={{ padding:'10px 8px', fontWeight:600, color:'var(--ink-900)' }}>{c.city}</td>
+                        <td style={{ padding:'10px 8px', textAlign:'right', fontWeight:600, color:'var(--ink-700)' }}>{c.orders}</td>
+                        <td style={{ padding:'10px 8px', textAlign:'right', fontWeight:600, color:'var(--green-700)' }}>{fmtMoney(c.gmv)}</td>
+                        <td style={{ padding:'10px 8px', textAlign:'right', minWidth:80 }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end' }}>
+                            <div style={{ flex:1, height:6, background:'var(--ink-100)', borderRadius:9999, maxWidth:60 }}>
+                              <div style={{ height:6, background:PIE_COLORS[i % PIE_COLORS.length], borderRadius:9999, width:`${shareWidth}%` }} />
+                            </div>
+                            <span style={{ fontSize:11, color:'var(--ink-500)', width:28, textAlign:'right' }}>{shareWidth}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

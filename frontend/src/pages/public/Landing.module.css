@@ -90,7 +90,7 @@
 
 .heroSub {
   font-size: clamp(16px, 2vw, 19px);
-  color: var(--always-sub);
+  color: rgba(255,255,255,0.82);
   line-height: 1.7;
   max-width: 520px;
   margin-bottom: var(--sp-6);
@@ -157,7 +157,7 @@
   gap: 5px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--always-sub-muted);
+  color: rgba(255,255,255,0.72);
 }
 .trustItem svg { color: var(--green-500); }
 

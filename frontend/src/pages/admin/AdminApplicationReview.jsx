@@ -58,8 +58,7 @@ export default function AdminApplicationReview() {
     } finally {
       setLoading(false);
     }
-  // toast is a stable Zustand store reference — omitting it is intentional
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id]);
 
   useEffect(() => { fetchApp(); }, [fetchApp]);
 
@@ -261,6 +260,12 @@ export default function AdminApplicationReview() {
                       <a href={doc.url} target="_blank" rel="noreferrer">
                         <img src={doc.url} alt={doc.doc_type}
                           style={{ width:'100%', height:110, objectFit:'cover', display:'block', background:'var(--ink-50)' }} />
+                      </a>
+                    ) : doc.mime_type === 'application/pdf' ? (
+                      <a href={doc.url} target="_blank" rel="noreferrer"
+                        style={{ display:'flex', flexDirection:'column', height:110, alignItems:'center', justifyContent:'center', gap:6, background:'#FEF9EE', textDecoration:'none', borderBottom:'1px solid var(--ink-200)' }}>
+                        <span style={{ fontSize:28 }}>📄</span>
+                        <span style={{ fontSize:11, fontWeight:600, color:'var(--green-700)' }}>Open PDF →</span>
                       </a>
                     ) : (
                       <a href={doc.url || '#'} target="_blank" rel="noreferrer"

@@ -1,13 +1,20 @@
 import type { Request, Response } from 'express';
 import prisma from '../config/prisma.ts';
 import { successResponse, errorResponse } from '../utils/response.ts';
+import { createNotification } from './notification.controller.ts';
+
+const GST_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
 export async function registerStore(req: Request, res: Response) {
   try {
     const { name, address_line, city, state, pincode, phone, drug_license_no, gst_number } = req.body;
 
-    if (!name || !address_line || !city || !state || !pincode || !phone || !drug_license_no || !gst_number) {
-      return errorResponse(res, "All fields are required", 400);
+    const missing = ['name','address_line','city','state','pincode','phone','drug_license_no','gst_number']
+      .filter(f => !req.body[f]).map(f => f.replace(/_/g,' '));
+    if (missing.length > 0) return errorResponse(res, `Missing required fields: ${missing.join(', ')}`, 400);
+
+    if (!GST_REGEX.test(gst_number.toUpperCase())) {
+      return errorResponse(res, 'Invalid GST Number format. Expected: 06AABCX1234D1Z5 (2-digit state code + 10-char PAN + Z + check digit)', 400);
     }
 
     const existing = await prisma.pharmacyStore.findUnique({ where: { drug_license_no } });
@@ -16,41 +23,35 @@ export async function registerStore(req: Request, res: Response) {
       if (existing.status === 'rejected' && existing.owner_id === req.userId) {
         const reapplied = await prisma.pharmacyStore.update({
           where: { id: existing.id },
-          data: {
-            name,
-            address_line,
-            city,
-            state,
-            pincode,
-            phone,
-            gst_number,
-            status: 'pending',
-            rejection_reason: null,
-          },
+          data: { name, address_line, city, state, pincode, phone, gst_number, status: 'pending', rejection_reason: null },
         });
-        return successResponse(res, reapplied, "Re-application submitted successfully", 200);
-      }
 
-      return errorResponse(res, 'A store with this drug license already exists', 409);
+        const admins = await prisma.user.findMany({ where: { role: 'admin', is_active: true }, select: { id: true } });
+        await Promise.all(admins.map(admin =>
+          createNotification(admin.id, 'store.new_application',
+            `Re-application: ${name}`,
+            `${name} (${city}, ${state}) has resubmitted after rejection. Drug License: ${drug_license_no}. Please review updated documents.`)
+        ));
+
+        return successResponse(res, reapplied, 'Re-application submitted successfully', 200);
+      }
+      return errorResponse(res, `A pharmacy with Drug License '${drug_license_no}' is already registered on MedMarket.`, 409);
     }
 
     const store = await prisma.pharmacyStore.create({
-      data: {
-        owner_id: req.userId,
-        name,
-        address_line,
-        city,
-        state,
-        pincode,
-        phone,
-        drug_license_no,
-        gst_number,
-        status: 'pending',
-      },
+      data: { owner_id: req.userId, name, address_line, city, state, pincode, phone, drug_license_no, gst_number, status: 'pending' },
     });
 
-    return successResponse(res, store, "Store registered successfully", 201);
+    const admins = await prisma.user.findMany({ where: { role: 'admin', is_active: true }, select: { id: true } });
+    await Promise.all(admins.map(admin =>
+      createNotification(admin.id, 'store.new_application',
+        `New pharmacy application: ${name}`,
+        `${name} (${city}, ${state}) has applied for verification. Drug License: ${drug_license_no}. Review and approve or reject.`)
+    ));
+
+    return successResponse(res, store, 'Store registered successfully', 201);
   } catch (error) {
+    console.error('registerStore error:', error);
     return errorResponse(res, 'Something went wrong', 500);
   }
 }

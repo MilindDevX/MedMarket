@@ -15,7 +15,18 @@ const PIE_COLORS = ['#0C6B4E','#1A56DB','#8B5CF6','#F59E0B','#10B981','#EF4444']
 const card      = { background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16, padding:'var(--sp-5)' };
 const cardTitle = { fontSize:16, fontWeight:700, color:'var(--ink-900)', letterSpacing:'-0.2px', marginBottom:'var(--sp-4)', display:'flex', alignItems:'center', gap:8 };
 
-const fmt = v => v >= 1000 ? `₹${(v/1000).toFixed(1)}k` : `₹${v}`;
+const fmtMoney = (v) => {
+  const n = Number(v);
+  if (n >= 10000000) return `₹${(n/10000000).toFixed(2)}Cr`;
+  if (n >= 100000)   return `₹${(n/100000).toFixed(1)}L`;
+  if (n >= 1000)     return `₹${(n/1000).toFixed(1)}k`;
+  return `₹${Math.round(n)}`;
+};
+const fmtAxis = v => {
+  if (v >= 100000) return `₹${(v/100000).toFixed(0)}L`;
+  if (v >= 1000)   return `₹${(v/1000).toFixed(0)}k`;
+  return `₹${v}`;
+};
 
 export default function PharmacyAnalytics() {
   usePageTitle('Analytics');
@@ -149,12 +160,12 @@ export default function PharmacyAnalytics() {
       {/* ── KPI Row ── */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(155px,1fr))', gap:'var(--sp-4)' }}>
         {[
-          { icon:TrendingUp,    label:'Total Revenue',       val:`₹${totalRevenue.toLocaleString('en-IN')}`,     color:'var(--green-700)' },
-          { icon:ShoppingBag,   label:'Total Orders',        val:totalOrders,                                    color:'var(--blue-700)' },
-          { icon:CheckCircle,   label:'Fulfillment Rate',    val:`${fulfillmentRate}%`,                          color:'var(--success-dark)' },
-          { icon:BarChart2,     label:'Avg Order Value',     val:`₹${Math.round(avgOrderValue)}`,                color:'#7C3AED' },
-          { icon:Users,         label:'Repeat Customer %',   val:`${repeatRate}%`,                              color:'var(--blue-700)' },
-          { icon:AlertTriangle, label:'Dead Stock Value',    val:`₹${Math.round(deadStockValue).toLocaleString('en-IN')}`, color:'var(--warning-dark)' },
+          { icon:TrendingUp,    label:'Total Revenue',       val:fmtMoney(totalRevenue),        color:'var(--green-700)' },
+          { icon:ShoppingBag,   label:'Total Orders',        val:totalOrders,                    color:'var(--blue-700)' },
+          { icon:CheckCircle,   label:'Fulfillment Rate',    val:`${fulfillmentRate}%`,           color:'var(--success-dark)' },
+          { icon:BarChart2,     label:'Avg Order Value',     val:fmtMoney(avgOrderValue),         color:'#7C3AED' },
+          { icon:Users,         label:'Repeat Customer %',   val:`${repeatRate}%`,                color:'var(--blue-700)' },
+          { icon:AlertTriangle, label:'Dead Stock Value',    val:fmtMoney(deadStockValue),        color:'var(--warning-dark)' },
         ].map(({ icon:Icon, label, val, color }, i) => (
           <motion.div key={label} style={card}
             initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.07 }}>
@@ -197,8 +208,8 @@ export default function PharmacyAnalytics() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--ink-100)" vertical={false} />
               <XAxis dataKey="day" tick={{ fontSize:11, fill:'var(--ink-400)' }} axisLine={false} tickLine={false}
                 interval={Math.ceil(revenueByDay.length / 7) - 1} />
-              <YAxis tick={{ fontSize:11, fill:'var(--ink-400)' }} axisLine={false} tickLine={false} tickFormatter={fmt} />
-              <Tooltip formatter={v => [`₹${Number(v).toLocaleString('en-IN')}`, 'Revenue']}
+              <YAxis tick={{ fontSize:11, fill:'var(--ink-400)' }} axisLine={false} tickLine={false} tickFormatter={fmtAxis} />
+              <Tooltip formatter={v => [fmtMoney(v), 'Revenue']}
                 contentStyle={{ background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:8, fontSize:13 }} />
               <Area type="monotone" dataKey="revenue" stroke="#0C6B4E" strokeWidth={2.5} fill="url(#revGrad)" />
             </AreaChart>

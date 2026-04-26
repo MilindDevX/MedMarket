@@ -1,8 +1,8 @@
 import usePageTitle from '../../utils/usePageTitle';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Upload, ArrowRight, ArrowLeft, Store, FileText, UserPlus, Eye, EyeOff, Loader } from 'lucide-react';
+import { CheckCircle, Upload, ArrowRight, ArrowLeft, Store, FileText, UserPlus, Eye, EyeOff, Loader, MapPin } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import useToastStore from '../../store/toastStore';
 import { api, getTokens } from '../../utils/api';
@@ -10,7 +10,6 @@ import styles from './PharmacyRegister.module.css';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
-// 3 steps — account, store details, documents + owner IDs
 const ALL_STEPS = [
   { id: 1, label: 'Create Account', icon: UserPlus },
   { id: 2, label: 'Store Details',  icon: Store },
@@ -24,7 +23,15 @@ const DOC_FIELDS = [
   { key: 'storeFront',  label: 'Store Photographs *',         doc_type: 'store_photo' },
 ];
 
-// Rejects emails like t@t.com — local part ≥2, domain label ≥2, TLD ≥2
+const INDIAN_STATES = [
+  'Andaman and Nicobar Islands','Andhra Pradesh','Arunachal Pradesh','Assam','Bihar',
+  'Chandigarh','Chhattisgarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Goa',
+  'Gujarat','Haryana','Himachal Pradesh','Jammu and Kashmir','Jharkhand','Karnataka',
+  'Kerala','Ladakh','Lakshadweep','Madhya Pradesh','Maharashtra','Manipur','Meghalaya',
+  'Mizoram','Nagaland','Odisha','Puducherry','Punjab','Rajasthan','Sikkim',
+  'Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal',
+];
+
 function isRealEmail(email) {
   if (!email) return false;
   const parts = email.split('@');
@@ -32,9 +39,7 @@ function isRealEmail(email) {
   const [local, domain] = parts;
   if (local.length < 2) return false;
   const domParts = domain.split('.');
-  if (domParts.length < 2) return false;
-  if (domParts[0].length < 2) return false;
-  if (domParts[domParts.length - 1].length < 2) return false;
+  if (domParts.length < 2 || domParts[0].length < 2 || domParts[domParts.length - 1].length < 2) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !email.includes('..');
 }
 
@@ -45,13 +50,9 @@ function isRealName(name) {
 }
 
 const initialData = {
-  // Step 1
   accountEmail: '', accountMobile: '', accountPassword: '', accountConfirm: '',
-  // Step 2
-  storeName: '', address: '', city: '', state: 'Haryana', pincode: '', phone: '', storeEmail: '',
-  // Step 3
-  drugLicenseNo: '', gstNumber: '', fssaiNo: '',
-  ownerAadhaar: '', ownerPan: '',
+  storeName: '', address: '', city: '', state: 'Delhi', pincode: '', phone: '', storeEmail: '',
+  drugLicenseNo: '', gstNumber: '', fssaiNo: '', ownerAadhaar: '', ownerPan: '',
 };
 
 async function uploadDoc(file, doc_type) {
@@ -69,6 +70,16 @@ async function uploadDoc(file, doc_type) {
   return data.data;
 }
 
+function Field({ label, value, onChange, placeholder, type = 'text' }) {
+  return (
+    <div className={styles.field}>
+      <label className={styles.label}>{label}</label>
+      <input type={type} className={styles.input} value={value}
+        onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+    </div>
+  );
+}
+
 export default function PharmacyRegister() {
   usePageTitle('Register Your Pharmacy');
 
@@ -80,24 +91,58 @@ export default function PharmacyRegister() {
   const startStep = alreadyLoggedIn ? 2 : 1;
   const steps     = alreadyLoggedIn ? ALL_STEPS.slice(1) : ALL_STEPS;
 
-  const [step,         setStep]         = useState(startStep);
-  const [data,         setData]         = useState(initialData);
-  const [accountName,  setAccountName]  = useState(''); // collected separately for clarity
-  const [fileObjects,  setFileObjects]  = useState({});
-  const [fileNames,    setFileNames]    = useState({});
-  const [uploadStatus, setUploadStatus] = useState({});
-  const [storeId,      setStoreId]      = useState(null);
-  const [submitted,    setSubmitted]    = useState(false);
-  const [loading,      setLoading]      = useState(false);
-  const [showPw,       setShowPw]       = useState(false);
-  const [showCf,       setShowCf]       = useState(false);
+  const [step,          setStep]          = useState(startStep);
+  const [data,          setData]          = useState(initialData);
+  const [accountName,   setAccountName]   = useState('');
+  const [fileObjects,   setFileObjects]   = useState({});
+  const [fileNames,     setFileNames]     = useState({});
+  const [uploadStatus,  setUploadStatus]  = useState({});
+  const [storeId,       setStoreId]       = useState(null);
+  const [submitted,     setSubmitted]     = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [showPw,        setShowPw]        = useState(false);
+  const [showCf,        setShowCf]        = useState(false);
+  const [pincodeStatus, setPincodeStatus] = useState('idle');
+
+  const pincodeTimer = useRef(null);
 
   const set = (key, val) => setData(d => ({ ...d, [key]: val }));
+
+  const handlePincodeChange = (val) => {
+    set('pincode', val);
+    const digits = val.replace(/\D/g, '');
+    if (pincodeTimer.current) clearTimeout(pincodeTimer.current);
+    if (digits.length !== 6) { setPincodeStatus('idle'); return; }
+    setPincodeStatus('loading');
+    pincodeTimer.current = setTimeout(async () => {
+      try {
+        const res  = await fetch(`https://api.postalpincode.in/pincode/${digits}`);
+        const json = await res.json();
+        const post = json?.[0];
+        if (post?.Status === 'Success' && post.PostOffice?.length > 0) {
+          const office = post.PostOffice[0];
+          const city   = office.Division || office.District || office.Name || '';
+          const state  = office.State || '';
+          setData(d => ({
+            ...d,
+            pincode: digits,
+            city,
+            state: INDIAN_STATES.includes(state) ? state : d.state,
+          }));
+          setPincodeStatus('found');
+        } else {
+          setPincodeStatus('error');
+        }
+      } catch {
+        setPincodeStatus('error');
+      }
+    }, 500);
+  };
 
   const validate = () => {
     if (step === 1) {
       if (!isRealName(accountName)) { toast.error('Enter your real full name (at least 2 letters).'); return false; }
-      if (!isRealEmail(data.accountEmail)) { toast.error('Enter a valid email address (e.g. name@domain.com).'); return false; }
+      if (!isRealEmail(data.accountEmail)) { toast.error('Enter a valid email address.'); return false; }
       if (!/^[6-9]\d{9}$/.test(data.accountMobile)) { toast.error('Enter a valid 10-digit Indian mobile number.'); return false; }
       if (data.accountPassword.length < 8) { toast.error('Password must be at least 8 characters.'); return false; }
       if (!/[A-Z]/.test(data.accountPassword)) { toast.error('Password must contain at least one uppercase letter.'); return false; }
@@ -115,7 +160,7 @@ export default function PharmacyRegister() {
       if (!data.drugLicenseNo.trim()) { toast.error('Drug License Number is required.'); return false; }
       if (!data.gstNumber.trim())     { toast.error('GST Number is required.'); return false; }
       if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(data.gstNumber.toUpperCase())) {
-        toast.error('GST Number format invalid. Expected: 06AABCX1234D1Z5'); return false;
+        toast.error('Invalid GST format. Expected: 06AABCX1234D1Z5'); return false;
       }
       if (!/^\d{12}$/.test(data.ownerAadhaar.replace(/\s/g, ''))) { toast.error('Enter a valid 12-digit Aadhaar number.'); return false; }
       if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(data.ownerPan)) { toast.error('Enter a valid PAN number (e.g. ABCDE1234F).'); return false; }
@@ -159,19 +204,12 @@ export default function PharmacyRegister() {
     setLoading(true);
     try {
       const storeRes = await api.post('/pharmacy', {
-        name:            data.storeName,
-        address_line:    data.address,
-        city:            data.city,
-        state:           data.state,
-        pincode:         data.pincode,
-        phone:           data.phone,
-        email:           data.storeEmail || '',
-        drug_license_no: data.drugLicenseNo,
-        gst_number:      data.gstNumber,
-        fssai_no:        data.fssaiNo || '',
+        name: data.storeName, address_line: data.address,
+        city: data.city, state: data.state, pincode: data.pincode,
+        phone: data.phone, email: data.storeEmail || '',
+        drug_license_no: data.drugLicenseNo, gst_number: data.gstNumber, fssai_no: data.fssaiNo || '',
       });
       setStoreId(storeRes.data?.id || null);
-
       const uploadResults = await Promise.allSettled(
         DOC_FIELDS.map(async ({ key, doc_type }) => {
           const file = fileObjects[key];
@@ -187,9 +225,7 @@ export default function PharmacyRegister() {
         })
       );
       const failed = uploadResults.filter(r => r.status === 'rejected');
-      if (failed.length > 0) {
-        toast.warning('Store registered but some documents failed to upload. Re-upload from Store Profile.');
-      }
+      if (failed.length > 0) toast.warning('Store registered but some documents failed to upload. Re-upload from Store Profile.');
       setSubmitted(true);
     } catch (err) {
       toast.error(err.message || 'Failed to submit application. Please try again.');
@@ -209,7 +245,7 @@ export default function PharmacyRegister() {
           transition={{ type:'spring', stiffness:260, damping:22 }}>
           <div className={styles.successIcon}><CheckCircle size={40} strokeWidth={1.5} /></div>
           <h2>Application Submitted!</h2>
-          <p>Your pharmacy registration is under review. Our team will verify your documents within 24–48 hours. This page will redirect automatically once you're approved.</p>
+          <p>Your pharmacy registration is under review. Our team will verify your documents within 24–48 hours.</p>
           <div className={styles.refCard}>
             <span className={styles.refLabel}>Application Reference</span>
             <span className={styles.refValue}>{refCode}</span>
@@ -232,7 +268,7 @@ export default function PharmacyRegister() {
           <h2 className={styles.leftTitle}>Join India's most trusted pharmacy network</h2>
           <p className={styles.leftSub}>3 steps. Under 5 minutes. Verified within 48 hours.</p>
           <div className={styles.stepList}>
-            {steps.map(({ id, label, icon:Icon }) => (
+            {steps.map(({ id, label, icon: Icon }) => (
               <div key={id} className={`${styles.stepItem} ${step===id ? styles.stepActive : ''} ${step>id ? styles.stepDone : ''}`}>
                 <div className={styles.stepCircle}>
                   {step > id ? <CheckCircle size={16} strokeWidth={2.5} /> : <Icon size={16} strokeWidth={1.8} />}
@@ -261,7 +297,6 @@ export default function PharmacyRegister() {
             <motion.div key={step} initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }}
               exit={{ opacity:0, x:-20 }} transition={{ duration:0.2 }}>
 
-              {/* Step 1 — Account */}
               {step === 1 && (
                 <div className={styles.fields}>
                   <Field label="Your Full Name *" value={accountName} onChange={setAccountName} placeholder="As per Aadhaar card" />
@@ -271,7 +306,7 @@ export default function PharmacyRegister() {
                     <label className={styles.label}>Password * <span style={{ fontSize:11, fontWeight:400, color:'var(--ink-400)' }}>(min. 8 chars, 1 uppercase, 1 number)</span></label>
                     <div style={{ position:'relative' }}>
                       <input type={showPw ? 'text' : 'password'} className={styles.input} value={data.accountPassword} onChange={e => set('accountPassword', e.target.value)} placeholder="Minimum 8 characters" />
-                      <button type="button" onClick={() => setShowPw(s=>!s)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color:'var(--ink-400)', background:'none', border:'none', cursor:'pointer', display:'flex', padding:2 }}>
+                      <button type="button" onClick={() => setShowPw(s => !s)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color:'var(--ink-400)', background:'none', border:'none', cursor:'pointer', display:'flex', padding:2 }}>
                         {showPw ? <EyeOff size={16}/> : <Eye size={16}/>}
                       </button>
                     </div>
@@ -280,7 +315,7 @@ export default function PharmacyRegister() {
                     <label className={styles.label}>Confirm Password *</label>
                     <div style={{ position:'relative' }}>
                       <input type={showCf ? 'text' : 'password'} className={styles.input} value={data.accountConfirm} onChange={e => set('accountConfirm', e.target.value)} placeholder="Re-enter your password" />
-                      <button type="button" onClick={() => setShowCf(s=>!s)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color:'var(--ink-400)', background:'none', border:'none', cursor:'pointer', display:'flex', padding:2 }}>
+                      <button type="button" onClick={() => setShowCf(s => !s)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color:'var(--ink-400)', background:'none', border:'none', cursor:'pointer', display:'flex', padding:2 }}>
                         {showCf ? <EyeOff size={16}/> : <Eye size={16}/>}
                       </button>
                     </div>
@@ -288,29 +323,51 @@ export default function PharmacyRegister() {
                 </div>
               )}
 
-              {/* Step 2 — Store Details */}
               {step === 2 && (
                 <div className={styles.fields}>
-                  <Field label="Store Name *"    value={data.storeName} onChange={v => set('storeName', v)} placeholder="e.g. Sharma Medical Store" />
-                  <Field label="Store Address *"  value={data.address}   onChange={v => set('address', v)}   placeholder="Shop No., Street, Area" />
-                  <div className={styles.row2}>
-                    <Field label="City *"     value={data.city}    onChange={v => set('city', v)}    placeholder="Sonipat" />
-                    <Field label="PIN Code *" value={data.pincode} onChange={v => set('pincode', v)} placeholder="131001" />
+                  <Field label="Store Name *"    value={data.storeName}  onChange={v => set('storeName', v)}  placeholder="e.g. Sharma Medical Store" />
+                  <Field label="Store Address *" value={data.address}    onChange={v => set('address', v)}    placeholder="Shop No., Street, Area" />
+
+                  <div className={styles.field}>
+                    <label className={styles.label}>
+                      PIN Code *
+                      {pincodeStatus === 'loading' && (
+                        <span style={{ marginLeft:8, fontSize:11, color:'var(--ink-400)', display:'inline-flex', alignItems:'center', gap:4 }}>
+                          <Loader size={11} style={{ animation:'spin 0.8s linear infinite' }} /> Looking up…
+                        </span>
+                      )}
+                      {pincodeStatus === 'found' && (
+                        <span style={{ marginLeft:8, fontSize:11, color:'var(--success-dark)', display:'inline-flex', alignItems:'center', gap:4 }}>
+                          <MapPin size={11} /> City &amp; state auto-filled
+                        </span>
+                      )}
+                      {pincodeStatus === 'error' && (
+                        <span style={{ marginLeft:8, fontSize:11, color:'var(--warning-dark)' }}>
+                          PIN not found — fill city and state manually
+                        </span>
+                      )}
+                    </label>
+                    <input type="text" maxLength={6} className={styles.input} value={data.pincode}
+                      onChange={e => handlePincodeChange(e.target.value)} placeholder="6-digit PIN code" />
                   </div>
+
+                  <div className={styles.row2}>
+                    <Field label="City *" value={data.city} onChange={v => set('city', v)} placeholder="Auto-filled from PIN" />
+                    <div className={styles.selectField}>
+                      <label className={styles.label}>State *</label>
+                      <select className={styles.select} value={data.state} onChange={e => set('state', e.target.value)}>
+                        {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
                   <div className={styles.row2}>
                     <Field label="Store Phone *" value={data.phone}      onChange={v => set('phone', v)}      placeholder="98XXXXXXXX" type="tel" />
                     <Field label="Store Email"   value={data.storeEmail} onChange={v => set('storeEmail', v)} placeholder="store@email.com" type="email" />
                   </div>
-                  <div className={styles.selectField}>
-                    <label className={styles.label}>State *</label>
-                    <select className={styles.select} value={data.state} onChange={e => set('state', e.target.value)}>
-                      {['Haryana','Delhi','Uttar Pradesh','Punjab','Rajasthan','Maharashtra','Karnataka'].map(s => <option key={s}>{s}</option>)}
-                    </select>
-                  </div>
                 </div>
               )}
 
-              {/* Step 3 — Documents & Owner IDs */}
               {step === 3 && (
                 <div className={styles.fields}>
                   <Field label="Drug License Number *"     value={data.drugLicenseNo} onChange={v => set('drugLicenseNo', v)} placeholder="HR-DL-20-2024-XXXXX" />
@@ -320,7 +377,6 @@ export default function PharmacyRegister() {
                     <Field label="PAN Number *"      value={data.ownerPan}    onChange={v => set('ownerPan', v)}     placeholder="ABCDE1234F" />
                   </div>
                   <Field label="FSSAI License (optional)" value={data.fssaiNo} onChange={v => set('fssaiNo', v)} placeholder="FSSAI License Number" />
-
                   <div className={styles.uploadSection}>
                     <div className={styles.uploadLabel}>
                       Upload Documents
@@ -374,16 +430,7 @@ export default function PharmacyRegister() {
           </p>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Field({ label, value, onChange, placeholder, type='text' }) {
-  return (
-    <div className={styles.field}>
-      <label className={styles.label}>{label}</label>
-      <input type={type} className={styles.input} value={value}
-        onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

@@ -27,8 +27,29 @@ export async function addInventory(req: Request, res: Response) {
     } = req.body;
 
     if (!medicine_id || !batch_number || !mfg_date || !exp_date || !quantity || !selling_price) {
-      return errorResponse(res, "All fields are required", 400);
+      const missing = ['medicine_id','batch_number','mfg_date','exp_date','quantity','selling_price']
+        .filter(f => !req.body[f])
+        .map(f => f.replace(/_/g,' '));
+      return errorResponse(res, `Missing required fields: ${missing.join(', ')}`, 400);
     }
+
+    const qty = Number(quantity);
+    if (isNaN(qty) || qty < 1)       return errorResponse(res, 'Quantity must be at least 1', 400);
+    if (qty > 100000)                 return errorResponse(res, 'Quantity cannot exceed 1,00,000 units per batch entry', 400);
+
+    const mfgDate = new Date(mfg_date);
+    const expDate = new Date(exp_date);
+    const today   = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (isNaN(mfgDate.getTime())) return errorResponse(res, 'Invalid manufacturing date format', 400);
+    if (isNaN(expDate.getTime())) return errorResponse(res, 'Invalid expiry date format', 400);
+    if (expDate <= mfgDate)       return errorResponse(res, 'Expiry date must be after manufacturing date', 400);
+    if (expDate <= today)         return errorResponse(res, 'Cannot add an already-expired batch', 400);
+
+    const maxExpiry = new Date(mfgDate);
+    maxExpiry.setFullYear(maxExpiry.getFullYear() + 30);
+    if (expDate > maxExpiry)      return errorResponse(res, 'Expiry date cannot be more than 30 years after the manufacturing date', 400);
 
     const medicine = await prisma.medicineMaster.findFirst({
       where: { id: medicine_id, is_active: true },
@@ -37,7 +58,7 @@ export async function addInventory(req: Request, res: Response) {
     if (!medicine) {
       return errorResponse(res, "Medicine not found", 404);
     }
-    
+
     if (medicine.schedule !== "otc") {
       return errorResponse(
         res,
@@ -59,9 +80,9 @@ export async function addInventory(req: Request, res: Response) {
         store_id: store.id,
         medicine_id,
         batch_number,
-        mfg_date: new Date(mfg_date),
-        exp_date: new Date(exp_date),
-        quantity: Number(quantity),
+        mfg_date: mfgDate,
+        exp_date: expDate,
+        quantity: qty,
         selling_price: Number(selling_price),
         low_stock_threshold: low_stock_threshold ? Number(low_stock_threshold) : 10,
       },

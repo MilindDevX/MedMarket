@@ -1,44 +1,71 @@
 /**
- * MedMarket India — Database Seed
- * ─────────────────────────────────
- * Run with:  npx tsx prisma/seed.ts
+ * MedMarket India — Analytics Showcase Seed
  *
- * What this creates:
- *  1 Admin          — Milind Rao  (milind@medmarket.in / Admin@1234)
- *  3 Consumers      — Priya, Arjun, Sneha
- *  4 Pharmacies     — 2 approved, 1 pending, 1 rejected
- *  30 Medicines     — Real OTC drugs used in India (Crocin, Dolo, Pan-D, etc.)
- *  Inventory        — Each approved pharmacy stocked with ~18 medicines
- *  12 Orders        — Mix of all statuses (delivered, dispatched, accepted, confirmed, rejected)
- *  Addresses        — Home/office addresses for each consumer
- *  Notifications    — Order & store events
- *  Complaints       — 2 sample complaints
- *  PlatformSettings — Default config singleton
+ * Run:  npx tsx prisma/seed.ts  OR  npm run db:seed
+ *
+ * Designed to populate every analytics panel with meaningful data:
+ *   - Pharmacy: 14-day revenue trend, hourly heatmap, top medicines,
+ *               fulfillment/rejection/repeat-customer rates, dead stock alert
+ *   - Admin: multi-city GMV, city ranking, platform top medicines,
+ *            consumer activation, approval turnaround, new registrations
  */
 
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import prisma from "../src/config/prisma.ts";
 
-// ─── helpers ────────────────────────────────────────────────────────────────
 const hash = (pw: string) => bcrypt.hash(pw, 10);
 
-function daysAgo(n: number) {
+function daysAgo(n: number, hour = 12, minute = 0): Date {
   const d = new Date();
   d.setDate(d.getDate() - n);
+  d.setHours(hour, minute, 0, 0);
   return d;
 }
-function daysFromNow(n: number) {
+function daysFromNow(n: number): Date {
   const d = new Date();
   d.setDate(d.getDate() + n);
+  d.setHours(12, 0, 0, 0);
   return d;
 }
 
-// ─── main ────────────────────────────────────────────────────────────────────
-async function main() {
-  console.log('🌱 Starting MedMarket seed…\n');
+// Realistic hourly order distribution: peaks at 9-11am and 7-9pm
+const HOUR_WEIGHTS = [0,0,0,0,0,0,1,2,5,8,8,6,4,3,4,4,5,7,9,8,5,3,1,0];
+const HOUR_TOTAL   = HOUR_WEIGHTS.reduce((a,b) => a+b, 0);
 
-  // ── 0. Clear existing data (order matters for FK constraints) ──────────────
+function pickHour(): number {
+  let r = Math.random() * HOUR_TOTAL;
+  for (let h = 0; h < 24; h++) {
+    r -= HOUR_WEIGHTS[h];
+    if (r <= 0) return h;
+  }
+  return 10;
+}
+
+function orderDate(daysBack: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - daysBack);
+  const h = pickHour();
+  d.setHours(h, Math.floor(Math.random() * 60), 0, 0);
+  return d;
+}
+
+function calcTotals(subtotal: number, deliveryType: 'delivery' | 'pickup') {
+  const delivery_fee = deliveryType === 'delivery' && subtotal < 200 ? 30 : 0;
+  const gst_amount   = parseFloat((subtotal * 0.12).toFixed(2));
+  const total_amount = parseFloat((subtotal + delivery_fee + gst_amount).toFixed(2));
+  return { subtotal, delivery_fee, gst_amount, total_amount };
+}
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+async function main() {
+  console.log('🌱  MedMarket analytics seed starting…\n');
+
+  // ── Clear all tables in dependency order ─────────────────────────────────
   await prisma.notification.deleteMany();
   await prisma.complaint.deleteMany();
   await prisma.orderItem.deleteMany();
@@ -55,622 +82,460 @@ async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.platformSettings.deleteMany();
   await prisma.user.deleteMany();
-  console.log('✅ Cleared existing data');
+  console.log('✅  Cleared existing data');
 
-  // ── 1. Platform Settings ────────────────────────────────────────────────────
+  // ── Platform settings ─────────────────────────────────────────────────────
   await prisma.platformSettings.create({
     data: {
-      id: 'singleton',
-      gst_rate: 12,
-      delivery_fee: 30,
-      free_delivery_threshold: 200,
-      cod_limit: 2000,
-      order_timeout_minutes: 30,
-      expiry_warn_60: true,
-      expiry_warn_30: true,
-      dead_stock_alert: true,
-      email_invoice: true,
-      sms_on_order: true,
-      updated_at: new Date(),
+      id: 'singleton', gst_rate: 12, delivery_fee: 30, free_delivery_threshold: 200,
+      cod_limit: 2000, order_timeout_minutes: 30,
+      expiry_warn_60: true, expiry_warn_30: true, dead_stock_alert: true,
+      email_invoice: true, sms_on_order: true, updated_at: new Date(),
     },
   });
-  console.log('✅ Platform settings created');
 
-  // ── 2. Users ─────────────────────────────────────────────────────────────────
-  const [milind, priya, arjun, sneha, rahul, fatima] = await Promise.all([
-    // Admin
-    prisma.user.create({ data: { name: 'Milind Rao', email: 'milind@medmarket.in', mobile: '+919876543210', password_hash: await hash('Admin@1234'), role: 'admin' } }),
-    // Consumers
-    prisma.user.create({ data: { name: 'Priya Sharma', email: 'priya.sharma@gmail.com', mobile: '+919812345678', password_hash: await hash('Consumer@1234'), role: 'consumer' } }),
-    prisma.user.create({ data: { name: 'Arjun Mehta', email: 'arjun.mehta@gmail.com', mobile: '+919823456789', password_hash: await hash('Consumer@1234'), role: 'consumer' } }),
-    prisma.user.create({ data: { name: 'Sneha Kulkarni', email: 'sneha.kulkarni@gmail.com', mobile: '+919834567890', password_hash: await hash('Consumer@1234'), role: 'consumer' } }),
-    // Pharmacy owners
-    prisma.user.create({ data: { name: 'Rahul Gupta', email: 'rahul.gupta@medplus.in', mobile: '+919845678901', password_hash: await hash('Pharma@1234'), role: 'pharmacy_owner' } }),
-    prisma.user.create({ data: { name: 'Fatima Sheikh', email: 'fatima.sheikh@healthcure.in', mobile: '+919856789012', password_hash: await hash('Pharma@1234'), role: 'pharmacy_owner' } }),
-  ]);
+  // ── Users ─────────────────────────────────────────────────────────────────
+  const milind   = await prisma.user.create({ data: { name:'Milind Rao', email:'milind@medmarket.in', mobile:'+919800000001', password_hash: await hash('Admin@1234'), role:'admin', created_at: daysAgo(90) } });
 
-  const [vikram, deepa] = await Promise.all([
-    prisma.user.create({ data: { name: 'Vikram Nair', email: 'vikram.nair@apollo.in', mobile: '+919867890123', password_hash: await hash('Pharma@1234'), role: 'pharmacy_owner' } }),
-    prisma.user.create({ data: { name: 'Deepa Joshi', email: 'deepa.joshi@jantapharma.in', mobile: '+919878901234', password_hash: await hash('Pharma@1234'), role: 'pharmacy_owner' } }),
-  ]);
+  // Pharmacy owners
+  const rahul    = await prisma.user.create({ data: { name:'Rahul Gupta', email:'rahul@medplus.in', mobile:'+919800000002', password_hash: await hash('Pharma@1234'), role:'pharmacy_owner', created_at: daysAgo(65) } });
+  const fatima   = await prisma.user.create({ data: { name:'Fatima Sheikh', email:'fatima@healthcure.in', mobile:'+919800000003', password_hash: await hash('Pharma@1234'), role:'pharmacy_owner', created_at: daysAgo(80) } });
+  const vikram   = await prisma.user.create({ data: { name:'Vikram Nair', email:'vikram@apollo.in', mobile:'+919800000004', password_hash: await hash('Pharma@1234'), role:'pharmacy_owner', created_at: daysAgo(5) } });
+  const deepa    = await prisma.user.create({ data: { name:'Deepa Joshi', email:'deepa@janta.in', mobile:'+919800000005', password_hash: await hash('Pharma@1234'), role:'pharmacy_owner', created_at: daysAgo(10) } });
 
-  console.log('✅ Users created (1 admin, 3 consumers, 4 pharmacy owners)');
+  // Consumers – registered at different points to show registration trend
+  const priya    = await prisma.user.create({ data: { name:'Priya Sharma', email:'priya@gmail.com', mobile:'+919800000010', password_hash: await hash('Consumer@1234'), role:'consumer', created_at: daysAgo(60) } });
+  const arjun    = await prisma.user.create({ data: { name:'Arjun Mehta', email:'arjun@gmail.com', mobile:'+919800000011', password_hash: await hash('Consumer@1234'), role:'consumer', created_at: daysAgo(45) } });
+  const sneha    = await prisma.user.create({ data: { name:'Sneha Kulkarni', email:'sneha@gmail.com', mobile:'+919800000012', password_hash: await hash('Consumer@1234'), role:'consumer', created_at: daysAgo(30) } });
+  const rohit    = await prisma.user.create({ data: { name:'Rohit Verma', email:'rohit@gmail.com', mobile:'+919800000013', password_hash: await hash('Consumer@1234'), role:'consumer', created_at: daysAgo(4) } });
+  const ananya   = await prisma.user.create({ data: { name:'Ananya Iyer', email:'ananya@gmail.com', mobile:'+919800000014', password_hash: await hash('Consumer@1234'), role:'consumer', created_at: daysAgo(2) } });
 
-  // ── 3. Consumer Addresses ──────────────────────────────────────────────────
-  await prisma.consumerAddress.createMany({
-    data: [
-      { consumer_id: priya.id,  label: 'Home',   address_line: '14, Vasant Vihar, Sector 9', city: 'Gurgaon',   pincode: '122001', latitude: 28.4595, longitude: 77.0266, is_default: true },
-      { consumer_id: priya.id,  label: 'Office', address_line: 'DLF Cyber City, Tower 8',    city: 'Gurgaon',   pincode: '122002', latitude: 28.4949, longitude: 77.0876, is_default: false },
-      { consumer_id: arjun.id,  label: 'Home',   address_line: 'B-47, Saket, South Delhi',   city: 'New Delhi', pincode: '110017', latitude: 28.5245, longitude: 77.2066, is_default: true },
-      { consumer_id: sneha.id,  label: 'Home',   address_line: '22, Koregaon Park, Lane 5',  city: 'Pune',      pincode: '411001', latitude: 18.5362, longitude: 73.8937, is_default: true },
-    ],
-  });
-  console.log('✅ Consumer addresses created');
+  console.log('✅  Users created');
 
-  // ── 4. Medicine Master Catalogue ──────────────────────────────────────────
-  const meds = await prisma.medicineMaster.createManyAndReturn({
-    data: [
-      // Pain & Fever
-      { name: 'Crocin 500mg',       generic_name: 'Paracetamol',           salt_composition: 'Paracetamol 500mg',                manufacturer: 'GSK Pharmaceuticals',     category: 'Pain Relief',       form: 'tablet',  pack_size: 'Strip of 15', mrp: 22.00,  schedule: 'otc', created_by: milind.id },
-      { name: 'Dolo 650mg',         generic_name: 'Paracetamol',           salt_composition: 'Paracetamol 650mg',                manufacturer: 'Micro Labs',              category: 'Pain Relief',       form: 'tablet',  pack_size: 'Strip of 15', mrp: 30.00,  schedule: 'otc', created_by: milind.id },
-      { name: 'Combiflam',          generic_name: 'Ibuprofen + Paracetamol', salt_composition: 'Ibuprofen 400mg + Paracetamol 325mg', manufacturer: 'Sanofi India',       category: 'Pain Relief',       form: 'tablet',  pack_size: 'Strip of 20', mrp: 35.00,  schedule: 'otc', created_by: milind.id },
-      { name: 'Ibugesic 400mg',     generic_name: 'Ibuprofen',             salt_composition: 'Ibuprofen 400mg',                  manufacturer: 'Cipla',                   category: 'Pain Relief',       form: 'tablet',  pack_size: 'Strip of 10', mrp: 27.00,  schedule: 'otc', created_by: milind.id },
-      { name: 'Volini Gel 30g',     generic_name: 'Diclofenac Sodium',     salt_composition: 'Diclofenac Diethylamine 1.16% w/w', manufacturer: 'Pfizer',                category: 'Pain Relief',       form: 'gel',     pack_size: 'Tube of 30g', mrp: 168.00, schedule: 'otc', created_by: milind.id },
-      // Antacids & GI
-      { name: 'Pan-D Capsule',      generic_name: 'Pantoprazole + Domperidone', salt_composition: 'Pantoprazole 40mg + Domperidone 10mg', manufacturer: 'Alkem Laboratories', category: 'Antacid',        form: 'capsule', pack_size: 'Strip of 10', mrp: 82.00,  schedule: 'otc', created_by: milind.id },
-      { name: 'Gelusil MPS Tablet', generic_name: 'Antacid Combination',   salt_composition: 'Magnesium Hydroxide + Aluminium Hydroxide + Simethicone', manufacturer: 'Pfizer', category: 'Antacid',   form: 'tablet',  pack_size: 'Strip of 18', mrp: 55.00,  schedule: 'otc', created_by: milind.id },
-      { name: 'Digene Syrup 200ml', generic_name: 'Antacid Syrup',         salt_composition: 'Aluminium Hydroxide + Magnesium Hydroxide + Simethicone', manufacturer: 'Abbott India', category: 'Antacid', form: 'syrup', pack_size: 'Bottle of 200ml', mrp: 140.00, schedule: 'otc', created_by: milind.id },
-      { name: 'Pudin Hara Pearls',  generic_name: 'Mint Oil Capsule',      salt_composition: 'Pudina Satva (Peppermint Oil) 25mg',  manufacturer: 'Dabur India',            category: 'Antacid',          form: 'capsule', pack_size: 'Pack of 40', mrp: 85.00,  schedule: 'otc', created_by: milind.id },
-      // Cold & Cough
-      { name: 'Benadryl Cough Syrup 100ml', generic_name: 'Diphenhydramine + Ammonium Chloride', salt_composition: 'Diphenhydramine HCl 14.08mg + Ammonium Chloride 138mg + Sodium Citrate', manufacturer: 'Johnson & Johnson', category: 'Cold & Cough', form: 'syrup', pack_size: 'Bottle of 100ml', mrp: 85.00, schedule: 'otc', created_by: milind.id },
-      { name: 'Vicks Vaporub 25g',  generic_name: 'Camphor + Menthol',     salt_composition: 'Camphor 4.7% + Menthol 2.6% + Eucalyptus Oil 1.2%', manufacturer: 'Procter & Gamble', category: 'Cold & Cough', form: 'gel', pack_size: 'Jar of 25g', mrp: 64.00, schedule: 'otc', created_by: milind.id },
-      { name: 'Strepsils Lozenges', generic_name: 'Amylmetacresol + Dichlorobenzyl', salt_composition: '2,4-Dichlorobenzyl Alcohol 1.2mg + Amylmetacresol 0.6mg', manufacturer: 'Reckitt Benckiser', category: 'Cold & Cough', form: 'tablet', pack_size: 'Pack of 16', mrp: 62.00, schedule: 'otc', created_by: milind.id },
-      // Vitamins & Supplements
-      { name: 'Limcee 500mg',       generic_name: 'Vitamin C',             salt_composition: 'Ascorbic Acid 500mg',              manufacturer: 'Abbott India',            category: 'Vitamins',          form: 'tablet',  pack_size: 'Strip of 15', mrp: 18.00,  schedule: 'otc', created_by: milind.id },
-      { name: 'Shelcal 500mg',      generic_name: 'Calcium + Vitamin D3',  salt_composition: 'Calcium Carbonate 1250mg + Vitamin D3 250IU', manufacturer: 'Torrent Pharmaceuticals', category: 'Vitamins', form: 'tablet', pack_size: 'Strip of 15', mrp: 130.00, schedule: 'otc', created_by: milind.id },
-      { name: 'Zincovit Tablet',    generic_name: 'Multivitamin + Zinc',   salt_composition: 'Vitamins A, B, C, D, E + Zinc + Selenium', manufacturer: 'Apex Laboratories', category: 'Vitamins', form: 'tablet', pack_size: 'Strip of 15', mrp: 155.00, schedule: 'otc', created_by: milind.id },
-      { name: 'Becosules Capsule',  generic_name: 'B-Complex + Vitamin C', salt_composition: 'Vitamin B1, B2, B3, B5, B6, B12 + Folic Acid + Biotin + Vitamin C', manufacturer: 'Pfizer', category: 'Vitamins', form: 'capsule', pack_size: 'Strip of 20', mrp: 95.00, schedule: 'otc', created_by: milind.id },
-      // Skin & Allergy
-      { name: 'Cetaphil Cream 80g', generic_name: 'Moisturising Cream',    salt_composition: 'Cetyl Alcohol + Propylene Glycol + Sodium Lauryl Sulphate', manufacturer: 'Galderma', category: 'Skin Care', form: 'gel', pack_size: 'Tube of 80g', mrp: 320.00, schedule: 'otc', created_by: milind.id },
-      { name: 'Avomine Tablet',     generic_name: 'Promethazine',          salt_composition: 'Promethazine Theoclate 25mg',       manufacturer: 'Pfizer',                  category: 'Allergy',           form: 'tablet',  pack_size: 'Strip of 10', mrp: 15.00,  schedule: 'otc', created_by: milind.id },
-      { name: 'Allegra 120mg',      generic_name: 'Fexofenadine',          salt_composition: 'Fexofenadine HCl 120mg',            manufacturer: 'Sanofi India',            category: 'Allergy',           form: 'tablet',  pack_size: 'Strip of 10', mrp: 192.00, schedule: 'otc', created_by: milind.id },
-      { name: 'Calamine Lotion 100ml', generic_name: 'Calamine',          salt_composition: 'Calamine 8% w/v + Zinc Oxide 4% w/v', manufacturer: 'Torrent Pharmaceuticals', category: 'Skin Care', form: 'syrup', pack_size: 'Bottle of 100ml', mrp: 48.00, schedule: 'otc', created_by: milind.id },
-      // Eye & Ear
-      { name: 'Tears Naturale Eye Drops 15ml', generic_name: 'Lubricant Eye Drops', salt_composition: 'Hydroxypropyl Methylcellulose 0.3% + Dextran 70 0.1%', manufacturer: 'Alcon', category: 'Eye Care', form: 'drops', pack_size: 'Bottle of 15ml', mrp: 175.00, schedule: 'otc', created_by: milind.id },
-      { name: 'Otrivin Nasal Drops 10ml', generic_name: 'Xylometazoline', salt_composition: 'Xylometazoline HCl 0.1% w/v', manufacturer: 'Novartis', category: 'Cold & Cough', form: 'drops', pack_size: 'Bottle of 10ml', mrp: 55.00, schedule: 'otc', created_by: milind.id },
-      // Hydration & First Aid
-      { name: 'Electral Powder ORS', generic_name: 'Oral Rehydration Salts', salt_composition: 'Sodium Chloride + Potassium Chloride + Sodium Citrate + Dextrose', manufacturer: 'Franco Indian Pharma', category: 'Hydration', form: 'powder', pack_size: 'Pack of 21.8g', mrp: 22.00, schedule: 'otc', created_by: milind.id },
-      { name: 'Betadine Ointment 20g', generic_name: 'Povidone Iodine',   salt_composition: 'Povidone Iodine 5% w/w',             manufacturer: 'Win Medicare',           category: 'First Aid',         form: 'gel',     pack_size: 'Tube of 20g',  mrp: 68.00,  schedule: 'otc', created_by: milind.id },
-      { name: 'Band-Aid Classic 10 strips', generic_name: 'Adhesive Bandage', salt_composition: 'Sterile adhesive bandage with absorbent pad', manufacturer: 'Johnson & Johnson', category: 'First Aid', form: 'tablet', pack_size: 'Pack of 10', mrp: 55.00, schedule: 'otc', created_by: milind.id },
-      // Diabetes & BP (OTC monitoring)
-      { name: 'Glucon-D 200g Orange', generic_name: 'Glucose Powder',     salt_composition: 'Glucose (Dextrose Monohydrate) with Vitamins', manufacturer: 'Heinz India', category: 'Hydration', form: 'powder', pack_size: 'Jar of 200g', mrp: 80.00, schedule: 'otc', created_by: milind.id },
-      // Digestive
-      { name: 'Isabgol Husk 100g',  generic_name: 'Psyllium Husk',        salt_composition: 'Isabgol Bhusi (Psyllium Husk) 100%', manufacturer: 'Dabur India',            category: 'Digestive',         form: 'powder',  pack_size: 'Jar of 100g',  mrp: 75.00,  schedule: 'otc', created_by: milind.id },
-      { name: 'Dulcolax Tablet',    generic_name: 'Bisacodyl',             salt_composition: 'Bisacodyl BP 5mg',                  manufacturer: 'Sanofi India',            category: 'Digestive',         form: 'tablet',  pack_size: 'Strip of 10',  mrp: 35.00,  schedule: 'otc', created_by: milind.id },
-      // Inhaler
-      { name: 'Asthalin Inhaler',   generic_name: 'Salbutamol',            salt_composition: 'Salbutamol Sulphate 100mcg/actuation', manufacturer: 'Cipla',                category: 'Respiratory',       form: 'inhaler', pack_size: '200 metered doses', mrp: 140.00, schedule: 'otc', created_by: milind.id },
-      // Sanitiser
-      { name: 'Dettol Antiseptic Liquid 100ml', generic_name: 'Chloroxylenol', salt_composition: 'Chloroxylenol 4.8% w/v', manufacturer: 'Reckitt Benckiser', category: 'First Aid', form: 'syrup', pack_size: 'Bottle of 100ml', mrp: 85.00, schedule: 'otc', created_by: milind.id },
-    ],
-  });
-
-  // Create a lookup by name for convenience
-  const med: Record<string, typeof meds[0]> = {};
-  for (const m of meds) med[m.name] = m;
-
-  console.log(`✅ ${meds.length} medicines added to master catalogue`);
-
-  // ── 5. Pharmacy Stores ────────────────────────────────────────────────────
-  // Store 1 — APPROVED (Rahul's MedPlus, Delhi)
+  // ── Pharmacy Stores ───────────────────────────────────────────────────────
   const store1 = await prisma.pharmacyStore.create({
     data: {
-      owner_id: rahul.id,
-      name: 'MedPlus Pharmacy — Saket',
-      address_line: 'Shop 12, Select Citywalk Mall, Saket',
-      city: 'New Delhi',
-      state: 'Delhi',
-      pincode: '110017',
-      latitude: 28.5245,
-      longitude: 77.2066,
-      phone: '+911140001234',
-      email: 'saket@medplus.in',
-      operating_hours: { open: '08:00', close: '22:00', days: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
-      status: 'approved',
-      drug_license_no: 'DL/DELHI/2024/MED/001234',
-      gst_number: '07AABCM1234C1Z5',
-      fssai_no: '13424999000123',
-      verified_at: daysAgo(30),
-      verified_by: milind.id,
-      avg_rating: 4.5,
-      total_reviews: 128,
+      owner_id: rahul.id, name:'MedPlus Pharmacy — Saket',
+      address_line:'Shop 12, Select Citywalk, Saket', city:'New Delhi', state:'Delhi', pincode:'110017',
+      latitude:28.5245, longitude:77.2066, phone:'+911140001234', email:'saket@medplus.in',
+      operating_hours:{ open:'08:00', close:'22:00', days:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
+      status:'approved', drug_license_no:'DL/DELHI/2024/MED/001234', gst_number:'07AABCM1234C1Z5',
+      fssai_no:'13424999000123', verified_at: daysAgo(58), verified_by: milind.id,
+      avg_rating:4.5, total_reviews:211, created_at: daysAgo(63),
     },
   });
 
-  // Store 2 — APPROVED (Fatima's HealthCure, Pune)
   const store2 = await prisma.pharmacyStore.create({
     data: {
-      owner_id: fatima.id,
-      name: 'HealthCure Medical Store',
-      address_line: '7, FC Road, Opposite Ferguson College',
-      city: 'Pune',
-      state: 'Maharashtra',
-      pincode: '411004',
-      latitude: 18.5195,
-      longitude: 73.8408,
-      phone: '+912025001234',
-      email: 'info@healthcure.in',
-      operating_hours: { open: '09:00', close: '21:00', days: ['Mon','Tue','Wed','Thu','Fri','Sat'] },
-      status: 'approved',
-      drug_license_no: 'MH/PUNE/2023/PHM/005678',
-      gst_number: '27AADCH5678F1Z2',
-      fssai_no: '11524999000456',
-      verified_at: daysAgo(60),
-      verified_by: milind.id,
-      avg_rating: 4.2,
-      total_reviews: 94,
+      owner_id: fatima.id, name:'HealthCure Medical Store',
+      address_line:'7, FC Road, Opp Ferguson College', city:'Pune', state:'Maharashtra', pincode:'411004',
+      latitude:18.5195, longitude:73.8408, phone:'+912025001234', email:'info@healthcure.in',
+      operating_hours:{ open:'09:00', close:'21:00', days:['Mon','Tue','Wed','Thu','Fri','Sat'] },
+      status:'approved', drug_license_no:'MH/PUNE/2023/PHM/005678', gst_number:'27AADCH5678F1Z2',
+      fssai_no:'11524999000456', verified_at: daysAgo(72), verified_by: milind.id,
+      avg_rating:4.3, total_reviews:178, created_at: daysAgo(78),
     },
   });
 
-  // Store 3 — PENDING (Vikram's Apollo)
-  const store3 = await prisma.pharmacyStore.create({
-    data: {
-      owner_id: vikram.id,
-      name: 'Apollo Pharmacy — Koramangala',
-      address_line: '45, 80 Feet Road, Koramangala 4th Block',
-      city: 'Bengaluru',
-      state: 'Karnataka',
-      pincode: '560034',
-      phone: '+918025001234',
-      email: 'koramangala@apollopharmacy.in',
-      operating_hours: { open: '07:00', close: '23:00', days: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
-      status: 'pending',
-      drug_license_no: 'KA/BLR/2025/DRG/009012',
-      gst_number: '29AAACA9012G1Z8',
-    },
-  });
-
-  // Store 4 — REJECTED (Deepa's Janta Pharma)
   await prisma.pharmacyStore.create({
     data: {
-      owner_id: deepa.id,
-      name: 'Janta Pharma',
-      address_line: 'Near Bus Stand, Station Road',
-      city: 'Nagpur',
-      state: 'Maharashtra',
-      pincode: '440001',
-      phone: '+917125001234',
-      status: 'rejected',
-      rejection_reason: 'Drug License document was expired. Please upload a valid license and resubmit.',
-      drug_license_no: 'MH/NGP/2022/PHM/001111',
-      gst_number: '27AADCJ1111K1Z9',
+      owner_id: vikram.id, name:'Apollo Pharmacy — Koramangala',
+      address_line:'45, 80 Feet Road, Koramangala 4th Block', city:'Bengaluru', state:'Karnataka', pincode:'560034',
+      phone:'+918025001234', status:'pending',
+      drug_license_no:'KA/BLR/2025/DRG/009012', gst_number:'29AAACA9012G1Z8',
+      created_at: daysAgo(5),
     },
   });
 
-  console.log('✅ 4 pharmacy stores created (2 approved, 1 pending, 1 rejected)');
-
-  // ── 6. Store Documents (for approved stores) ──────────────────────────────
-  await prisma.storeDocument.createMany({
-    data: [
-      { store_id: store1.id, doc_type: 'drug_license',     s3_key: 'stores/store1/drug_license.pdf',     original_filename: 'DL_MedPlus_Saket.pdf',      mime_type: 'application/pdf' },
-      { store_id: store1.id, doc_type: 'gst_certificate',  s3_key: 'stores/store1/gst_certificate.pdf',  original_filename: 'GST_MedPlus.pdf',           mime_type: 'application/pdf' },
-      { store_id: store1.id, doc_type: 'store_photo',      s3_key: 'stores/store1/store_front.jpg',      original_filename: 'storefront.jpg',            mime_type: 'image/jpeg' },
-      { store_id: store2.id, doc_type: 'drug_license',     s3_key: 'stores/store2/drug_license.pdf',     original_filename: 'DL_HealthCure.pdf',         mime_type: 'application/pdf' },
-      { store_id: store2.id, doc_type: 'gst_certificate',  s3_key: 'stores/store2/gst_certificate.pdf',  original_filename: 'GST_HealthCure.pdf',        mime_type: 'application/pdf' },
-      { store_id: store2.id, doc_type: 'store_photo',      s3_key: 'stores/store2/store_front.jpg',      original_filename: 'store_exterior.jpg',        mime_type: 'image/jpeg' },
-      { store_id: store3.id, doc_type: 'drug_license',     s3_key: 'stores/store3/drug_license.pdf',     original_filename: 'Apollo_DL_Koramangala.pdf', mime_type: 'application/pdf' },
-    ],
-  });
-
-  // ── 7. Bank Accounts ──────────────────────────────────────────────────────
-  await prisma.bankAccount.createMany({
-    data: [
-      { store_id: store1.id, bank_name: 'HDFC Bank', account_holder: 'Rahul Gupta', account_number_encrypted: 'enc_00112233445566', ifsc_code: 'HDFC0001234', is_verified: true },
-      { store_id: store2.id, bank_name: 'ICICI Bank', account_holder: 'Fatima Sheikh', account_number_encrypted: 'enc_99887766554433', ifsc_code: 'ICIC0005678', is_verified: true },
-    ],
-  });
-  console.log('✅ Store documents and bank accounts created');
-
-  // ── 8. Inventory — Store 1 (MedPlus, Delhi) ──────────────────────────────
-  const s1Inv = await prisma.storeInventory.createManyAndReturn({
-    data: [
-      { store_id: store1.id, medicine_id: med['Crocin 500mg'].id,             batch_number: 'CR2025A001', mfg_date: daysAgo(180), exp_date: daysFromNow(540), quantity: 250, selling_price: 20.00, low_stock_threshold: 30 },
-      { store_id: store1.id, medicine_id: med['Dolo 650mg'].id,               batch_number: 'DL2025B001', mfg_date: daysAgo(120), exp_date: daysFromNow(420), quantity: 180, selling_price: 28.00, low_stock_threshold: 30 },
-      { store_id: store1.id, medicine_id: med['Combiflam'].id,                batch_number: 'CB2025C001', mfg_date: daysAgo(90),  exp_date: daysFromNow(365), quantity: 120, selling_price: 33.00, low_stock_threshold: 20 },
-      { store_id: store1.id, medicine_id: med['Ibugesic 400mg'].id,           batch_number: 'IB2025D001', mfg_date: daysAgo(60),  exp_date: daysFromNow(480), quantity: 100, selling_price: 25.00, low_stock_threshold: 20 },
-      { store_id: store1.id, medicine_id: med['Volini Gel 30g'].id,           batch_number: 'VG2025E001', mfg_date: daysAgo(45),  exp_date: daysFromNow(600), quantity: 60,  selling_price: 155.00, low_stock_threshold: 10 },
-      { store_id: store1.id, medicine_id: med['Pan-D Capsule'].id,            batch_number: 'PD2025F001', mfg_date: daysAgo(30),  exp_date: daysFromNow(540), quantity: 200, selling_price: 78.00, low_stock_threshold: 30 },
-      { store_id: store1.id, medicine_id: med['Gelusil MPS Tablet'].id,       batch_number: 'GM2025G001', mfg_date: daysAgo(15),  exp_date: daysFromNow(720), quantity: 90,  selling_price: 50.00, low_stock_threshold: 15 },
-      { store_id: store1.id, medicine_id: med['Benadryl Cough Syrup 100ml'].id, batch_number: 'BC2025H001', mfg_date: daysAgo(20), exp_date: daysFromNow(400), quantity: 75, selling_price: 80.00, low_stock_threshold: 15 },
-      { store_id: store1.id, medicine_id: med['Limcee 500mg'].id,             batch_number: 'LC2025I001', mfg_date: daysAgo(10),  exp_date: daysFromNow(540), quantity: 300, selling_price: 16.00, low_stock_threshold: 50 },
-      { store_id: store1.id, medicine_id: med['Shelcal 500mg'].id,            batch_number: 'SC2025J001', mfg_date: daysAgo(5),   exp_date: daysFromNow(540), quantity: 80,  selling_price: 120.00, low_stock_threshold: 15 },
-      { store_id: store1.id, medicine_id: med['Becosules Capsule'].id,        batch_number: 'BV2025K001', mfg_date: daysAgo(25),  exp_date: daysFromNow(600), quantity: 110, selling_price: 90.00, low_stock_threshold: 20 },
-      { store_id: store1.id, medicine_id: med['Allegra 120mg'].id,            batch_number: 'AL2025L001', mfg_date: daysAgo(40),  exp_date: daysFromNow(480), quantity: 50,  selling_price: 185.00, low_stock_threshold: 10 },
-      { store_id: store1.id, medicine_id: med['Electral Powder ORS'].id,      batch_number: 'EP2025M001', mfg_date: daysAgo(12),  exp_date: daysFromNow(720), quantity: 400, selling_price: 20.00, low_stock_threshold: 50 },
-      { store_id: store1.id, medicine_id: med['Betadine Ointment 20g'].id,    batch_number: 'BD2025N001', mfg_date: daysAgo(8),   exp_date: daysFromNow(900), quantity: 45,  selling_price: 62.00, low_stock_threshold: 10 },
-      { store_id: store1.id, medicine_id: med['Tears Naturale Eye Drops 15ml'].id, batch_number: 'TN2025O001', mfg_date: daysAgo(20), exp_date: daysFromNow(360), quantity: 35, selling_price: 165.00, low_stock_threshold: 8 },
-      { store_id: store1.id, medicine_id: med['Asthalin Inhaler'].id,         batch_number: 'AI2025P001', mfg_date: daysAgo(30),  exp_date: daysFromNow(540), quantity: 25,  selling_price: 130.00, low_stock_threshold: 5 },
-      // Near-expiry item (for expiry alert demo)
-      { store_id: store1.id, medicine_id: med['Avomine Tablet'].id,           batch_number: 'AV2025Q001', mfg_date: daysAgo(700), exp_date: daysFromNow(22),  quantity: 18,  selling_price: 14.00, low_stock_threshold: 10, status: 'active' },
-      // Low stock item
-      { store_id: store1.id, medicine_id: med['Vicks Vaporub 25g'].id,        batch_number: 'VV2025R001', mfg_date: daysAgo(60),  exp_date: daysFromNow(480), quantity: 6,   selling_price: 60.00, low_stock_threshold: 10 },
-    ],
-  });
-
-  // ── 9. Inventory — Store 2 (HealthCure, Pune) ────────────────────────────
-  const s2Inv = await prisma.storeInventory.createManyAndReturn({
-    data: [
-      { store_id: store2.id, medicine_id: med['Crocin 500mg'].id,              batch_number: 'CR2025A002', mfg_date: daysAgo(200), exp_date: daysFromNow(500), quantity: 200, selling_price: 21.00, low_stock_threshold: 25 },
-      { store_id: store2.id, medicine_id: med['Dolo 650mg'].id,                batch_number: 'DL2025B002', mfg_date: daysAgo(100), exp_date: daysFromNow(450), quantity: 150, selling_price: 29.00, low_stock_threshold: 25 },
-      { store_id: store2.id, medicine_id: med['Pan-D Capsule'].id,             batch_number: 'PD2025F002', mfg_date: daysAgo(50),  exp_date: daysFromNow(520), quantity: 160, selling_price: 80.00, low_stock_threshold: 25 },
-      { store_id: store2.id, medicine_id: med['Digene Syrup 200ml'].id,        batch_number: 'DS2025G002', mfg_date: daysAgo(30),  exp_date: daysFromNow(600), quantity: 55,  selling_price: 132.00, low_stock_threshold: 10 },
-      { store_id: store2.id, medicine_id: med['Benadryl Cough Syrup 100ml'].id, batch_number: 'BC2025H002', mfg_date: daysAgo(40), exp_date: daysFromNow(380), quantity: 65, selling_price: 82.00, low_stock_threshold: 12 },
-      { store_id: store2.id, medicine_id: med['Strepsils Lozenges'].id,        batch_number: 'ST2025I002', mfg_date: daysAgo(25),  exp_date: daysFromNow(480), quantity: 80,  selling_price: 58.00, low_stock_threshold: 15 },
-      { store_id: store2.id, medicine_id: med['Limcee 500mg'].id,              batch_number: 'LC2025I002', mfg_date: daysAgo(20),  exp_date: daysFromNow(600), quantity: 250, selling_price: 17.00, low_stock_threshold: 40 },
-      { store_id: store2.id, medicine_id: med['Zincovit Tablet'].id,           batch_number: 'ZV2025J002', mfg_date: daysAgo(15),  exp_date: daysFromNow(540), quantity: 70,  selling_price: 148.00, low_stock_threshold: 12 },
-      { store_id: store2.id, medicine_id: med['Cetaphil Cream 80g'].id,        batch_number: 'CC2025K002', mfg_date: daysAgo(10),  exp_date: daysFromNow(720), quantity: 30,  selling_price: 305.00, low_stock_threshold: 8 },
-      { store_id: store2.id, medicine_id: med['Calamine Lotion 100ml'].id,     batch_number: 'CL2025L002', mfg_date: daysAgo(8),   exp_date: daysFromNow(540), quantity: 40,  selling_price: 45.00, low_stock_threshold: 8 },
-      { store_id: store2.id, medicine_id: med['Otrivin Nasal Drops 10ml'].id,  batch_number: 'OT2025M002', mfg_date: daysAgo(30),  exp_date: daysFromNow(360), quantity: 45,  selling_price: 50.00, low_stock_threshold: 10 },
-      { store_id: store2.id, medicine_id: med['Electral Powder ORS'].id,       batch_number: 'EP2025M002', mfg_date: daysAgo(5),   exp_date: daysFromNow(720), quantity: 350, selling_price: 20.00, low_stock_threshold: 50 },
-      { store_id: store2.id, medicine_id: med['Isabgol Husk 100g'].id,         batch_number: 'IH2025N002', mfg_date: daysAgo(60),  exp_date: daysFromNow(480), quantity: 60,  selling_price: 70.00, low_stock_threshold: 10 },
-      { store_id: store2.id, medicine_id: med['Dulcolax Tablet'].id,           batch_number: 'DC2025O002', mfg_date: daysAgo(45),  exp_date: daysFromNow(540), quantity: 50,  selling_price: 32.00, low_stock_threshold: 10 },
-      { store_id: store2.id, medicine_id: med['Glucon-D 200g Orange'].id,      batch_number: 'GD2025P002', mfg_date: daysAgo(20),  exp_date: daysFromNow(360), quantity: 90,  selling_price: 75.00, low_stock_threshold: 15 },
-      { store_id: store2.id, medicine_id: med['Dettol Antiseptic Liquid 100ml'].id, batch_number: 'DA2025Q002', mfg_date: daysAgo(15), exp_date: daysFromNow(900), quantity: 65, selling_price: 80.00, low_stock_threshold: 10 },
-      // Near-expiry (55 days — 60-day warning)
-      { store_id: store2.id, medicine_id: med['Pudin Hara Pearls'].id,         batch_number: 'PH2025R002', mfg_date: daysAgo(300), exp_date: daysFromNow(55),  quantity: 30,  selling_price: 80.00, low_stock_threshold: 10, status: 'active' },
-    ],
-  });
-
-  console.log('✅ Inventory created for both approved stores');
-
-  // ── 10. Blacklisted Batch ─────────────────────────────────────────────────
-  await prisma.blacklistedBatch.create({
+  await prisma.pharmacyStore.create({
     data: {
-      medicine_id: med['Crocin 500mg'].id,
-      batch_number: 'CR2024Z999',
-      reason: 'CDSCO Recall Notice RC/2026/0048 — sub-potent batch detected in quality audit',
-      blacklisted_by: milind.id,
-      blacklisted_at: daysAgo(7),
+      owner_id: deepa.id, name:'Janta Medical',
+      address_line:'Near Bus Stand, Station Road', city:'Nagpur', state:'Maharashtra', pincode:'440001',
+      phone:'+917125001234', status:'rejected',
+      rejection_reason:'Drug License document was expired. Please upload a valid license and resubmit.',
+      drug_license_no:'MH/NGP/2022/PHM/001111', gst_number:'27AADCJ1111K1Z9',
+      created_at: daysAgo(10),
     },
   });
-  console.log('✅ Blacklisted batch created');
 
-  // ── 11. Orders ────────────────────────────────────────────────────────────
-  // Helper to calculate totals
-  function calcTotals(items: { price: number; qty: number }[], delivery: 'delivery' | 'pickup') {
-    const subtotal    = items.reduce((s, i) => s + i.price * i.qty, 0);
-    const delivery_fee = delivery === 'delivery' && subtotal < 200 ? 30 : 0;
-    const gst_amount  = parseFloat((subtotal * 0.12).toFixed(2));
-    const total_amount = parseFloat((subtotal + delivery_fee + gst_amount).toFixed(2));
-    return { subtotal, delivery_fee, gst_amount, total_amount };
+  await prisma.storeDocument.createMany({
+    data:[
+      { store_id:store1.id, doc_type:'drug_license',    s3_key:'stores/s1/dl.pdf',    original_filename:'DL_MedPlus.pdf',    mime_type:'application/pdf' },
+      { store_id:store1.id, doc_type:'gst_certificate', s3_key:'stores/s1/gst.pdf',   original_filename:'GST_MedPlus.pdf',   mime_type:'application/pdf' },
+      { store_id:store1.id, doc_type:'store_photo',     s3_key:'stores/s1/front.jpg', original_filename:'storefront.jpg',    mime_type:'image/jpeg' },
+      { store_id:store2.id, doc_type:'drug_license',    s3_key:'stores/s2/dl.pdf',    original_filename:'DL_HealthCure.pdf', mime_type:'application/pdf' },
+      { store_id:store2.id, doc_type:'gst_certificate', s3_key:'stores/s2/gst.pdf',   original_filename:'GST_HC.pdf',        mime_type:'application/pdf' },
+      { store_id:store2.id, doc_type:'store_photo',     s3_key:'stores/s2/front.jpg', original_filename:'front.jpg',         mime_type:'image/jpeg' },
+    ],
+  });
+  await prisma.bankAccount.createMany({
+    data:[
+      { store_id:store1.id, bank_name:'HDFC Bank', account_holder:'Rahul Gupta', account_number_encrypted:'enc_hdfc_rahul', ifsc_code:'HDFC0001234', is_verified:true },
+      { store_id:store2.id, bank_name:'ICICI Bank', account_holder:'Fatima Sheikh', account_number_encrypted:'enc_icici_fatima', ifsc_code:'ICIC0005678', is_verified:true },
+    ],
+  });
+
+  console.log('✅  Stores created');
+
+  // ── Consumer addresses ────────────────────────────────────────────────────
+  await prisma.consumerAddress.createMany({
+    data:[
+      { consumer_id:priya.id,  label:'Home',   address_line:'14, Vasant Vihar, Sector 9', city:'New Delhi', pincode:'122001', is_default:true },
+      { consumer_id:arjun.id,  label:'Home',   address_line:'B-47, Saket South Delhi',    city:'New Delhi', pincode:'110017', is_default:true },
+      { consumer_id:sneha.id,  label:'Home',   address_line:'22, Koregaon Park, Lane 5',  city:'Pune',      pincode:'411001', is_default:true },
+      { consumer_id:rohit.id,  label:'Home',   address_line:'Sector 62, Noida',           city:'New Delhi', pincode:'201301', is_default:true },
+      { consumer_id:ananya.id, label:'Home',   address_line:'Indiranagar, 100 Feet Road', city:'Bengaluru', pincode:'560038', is_default:true },
+    ],
+  });
+
+  // ── Medicine Catalogue ────────────────────────────────────────────────────
+  const meds = await prisma.medicineMaster.createManyAndReturn({
+    data:[
+      // Pain Relief
+      { name:'Crocin 500mg',         generic_name:'Paracetamol',             salt_composition:'Paracetamol 500mg',                          manufacturer:'GSK',              category:'Pain Relief',   form:'tablet',  pack_size:'Strip of 15', mrp:22,   schedule:'otc', created_by:milind.id },
+      { name:'Dolo 650mg',           generic_name:'Paracetamol',             salt_composition:'Paracetamol 650mg',                          manufacturer:'Micro Labs',       category:'Pain Relief',   form:'tablet',  pack_size:'Strip of 15', mrp:30,   schedule:'otc', created_by:milind.id },
+      { name:'Combiflam',            generic_name:'Ibuprofen+Paracetamol',   salt_composition:'Ibuprofen 400mg + Paracetamol 325mg',        manufacturer:'Sanofi',           category:'Pain Relief',   form:'tablet',  pack_size:'Strip of 20', mrp:35,   schedule:'otc', created_by:milind.id },
+      { name:'Volini Gel 30g',       generic_name:'Diclofenac Sodium',       salt_composition:'Diclofenac Diethylamine 1.16% w/w',          manufacturer:'Pfizer',           category:'Pain Relief',   form:'gel',     pack_size:'Tube of 30g', mrp:168,  schedule:'otc', created_by:milind.id },
+      // Antacids & GI
+      { name:'Pan-D Capsule',        generic_name:'Pantoprazole+Domperidone',salt_composition:'Pantoprazole 40mg + Domperidone 10mg',       manufacturer:'Alkem',            category:'Antacid',       form:'capsule', pack_size:'Strip of 10', mrp:82,   schedule:'otc', created_by:milind.id },
+      { name:'Gelusil MPS Tablet',   generic_name:'Antacid Combination',     salt_composition:'Magnesium Hydroxide + Aluminium Hydroxide',  manufacturer:'Pfizer',           category:'Antacid',       form:'tablet',  pack_size:'Strip of 18', mrp:55,   schedule:'otc', created_by:milind.id },
+      { name:'Digene Syrup 200ml',   generic_name:'Antacid Syrup',           salt_composition:'Aluminium Hydroxide + Simethicone',          manufacturer:'Abbott',           category:'Antacid',       form:'syrup',   pack_size:'Bottle 200ml', mrp:140,  schedule:'otc', created_by:milind.id },
+      // Cold & Cough
+      { name:'Benadryl Cough 100ml', generic_name:'Diphenhydramine',         salt_composition:'Diphenhydramine HCl 14.08mg',                manufacturer:'J&J',              category:'Cold & Cough',  form:'syrup',   pack_size:'Bottle 100ml', mrp:85,   schedule:'otc', created_by:milind.id },
+      { name:'Strepsils Lozenges',   generic_name:'Amylmetacresol',          salt_composition:'2,4-Dichlorobenzyl Alcohol 1.2mg',           manufacturer:'Reckitt',          category:'Cold & Cough',  form:'tablet',  pack_size:'Pack of 16',  mrp:62,   schedule:'otc', created_by:milind.id },
+      { name:'Otrivin Nasal 10ml',   generic_name:'Xylometazoline',          salt_composition:'Xylometazoline HCl 0.1% w/v',               manufacturer:'Novartis',         category:'Cold & Cough',  form:'drops',   pack_size:'Bottle 10ml', mrp:55,   schedule:'otc', created_by:milind.id },
+      // Vitamins & Supplements
+      { name:'Limcee 500mg',         generic_name:'Vitamin C',               salt_composition:'Ascorbic Acid 500mg',                        manufacturer:'Abbott',           category:'Vitamins',      form:'tablet',  pack_size:'Strip of 15', mrp:18,   schedule:'otc', created_by:milind.id },
+      { name:'Shelcal 500mg',        generic_name:'Calcium + Vitamin D3',    salt_composition:'Calcium Carbonate 1250mg + Vitamin D3',      manufacturer:'Torrent',          category:'Vitamins',      form:'tablet',  pack_size:'Strip of 15', mrp:130,  schedule:'otc', created_by:milind.id },
+      { name:'Becosules Capsule',    generic_name:'B-Complex + Vitamin C',   salt_composition:'Vitamin B Complex + Folic Acid + Vitamin C', manufacturer:'Pfizer',           category:'Vitamins',      form:'capsule', pack_size:'Strip of 20', mrp:95,   schedule:'otc', created_by:milind.id },
+      // Hydration
+      { name:'Electral ORS Sachet',  generic_name:'Oral Rehydration Salts',  salt_composition:'Sodium Chloride + Glucose + Potassium',      manufacturer:'Franco Indian',    category:'Hydration',     form:'powder',  pack_size:'Pack of 21.8g',mrp:22,   schedule:'otc', created_by:milind.id },
+      { name:'Glucon-D 200g',        generic_name:'Glucose Powder',          salt_composition:'Dextrose Monohydrate with Vitamins',         manufacturer:'Heinz',            category:'Hydration',     form:'powder',  pack_size:'Jar of 200g',  mrp:80,   schedule:'otc', created_by:milind.id },
+      // Allergy & Skin
+      { name:'Allegra 120mg',        generic_name:'Fexofenadine',            salt_composition:'Fexofenadine HCl 120mg',                     manufacturer:'Sanofi',           category:'Allergy',       form:'tablet',  pack_size:'Strip of 10', mrp:192,  schedule:'otc', created_by:milind.id },
+      { name:'Calamine Lotion 100ml',generic_name:'Calamine',                salt_composition:'Calamine 8% w/v + Zinc Oxide 4% w/v',        manufacturer:'Torrent',          category:'Skin Care',     form:'syrup',   pack_size:'Bottle 100ml', mrp:48,   schedule:'otc', created_by:milind.id },
+      // Digestive
+      { name:'Isabgol Husk 100g',    generic_name:'Psyllium Husk',           salt_composition:'Psyllium Husk 100%',                         manufacturer:'Dabur',            category:'Digestive',     form:'powder',  pack_size:'Jar of 100g',  mrp:75,   schedule:'otc', created_by:milind.id },
+      // First Aid
+      { name:'Betadine Ointment 20g',generic_name:'Povidone Iodine',         salt_composition:'Povidone Iodine 5% w/w',                     manufacturer:'Win Medicare',     category:'First Aid',     form:'gel',     pack_size:'Tube of 20g',  mrp:68,   schedule:'otc', created_by:milind.id },
+      // Respiratory
+      { name:'Asthalin Inhaler',     generic_name:'Salbutamol',              salt_composition:'Salbutamol Sulphate 100mcg/actuation',        manufacturer:'Cipla',            category:'Respiratory',   form:'inhaler', pack_size:'200 doses',    mrp:140,  schedule:'otc', created_by:milind.id },
+    ],
+  });
+
+  const M: Record<string, typeof meds[0]> = {};
+  for (const m of meds) M[m.name] = m;
+
+  console.log(`✅  ${meds.length} medicines in catalogue`);
+
+  // ── Inventory — Store 1 (Delhi) ───────────────────────────────────────────
+  const s1inv = await prisma.storeInventory.createManyAndReturn({
+    data:[
+      { store_id:store1.id, medicine_id:M['Crocin 500mg'].id,          batch_number:'CR25A01', mfg_date:daysAgo(180), exp_date:daysFromNow(540), quantity:350, selling_price:20,  low_stock_threshold:40 },
+      { store_id:store1.id, medicine_id:M['Dolo 650mg'].id,            batch_number:'DL25B01', mfg_date:daysAgo(120), exp_date:daysFromNow(420), quantity:280, selling_price:28,  low_stock_threshold:40 },
+      { store_id:store1.id, medicine_id:M['Combiflam'].id,             batch_number:'CB25C01', mfg_date:daysAgo(90),  exp_date:daysFromNow(365), quantity:180, selling_price:33,  low_stock_threshold:25 },
+      { store_id:store1.id, medicine_id:M['Volini Gel 30g'].id,        batch_number:'VG25D01', mfg_date:daysAgo(60),  exp_date:daysFromNow(600), quantity:75,  selling_price:155, low_stock_threshold:10 },
+      { store_id:store1.id, medicine_id:M['Pan-D Capsule'].id,         batch_number:'PD25E01', mfg_date:daysAgo(45),  exp_date:daysFromNow(540), quantity:240, selling_price:78,  low_stock_threshold:30 },
+      { store_id:store1.id, medicine_id:M['Gelusil MPS Tablet'].id,    batch_number:'GM25F01', mfg_date:daysAgo(30),  exp_date:daysFromNow(720), quantity:120, selling_price:50,  low_stock_threshold:20 },
+      { store_id:store1.id, medicine_id:M['Benadryl Cough 100ml'].id,  batch_number:'BC25G01', mfg_date:daysAgo(25),  exp_date:daysFromNow(400), quantity:90,  selling_price:80,  low_stock_threshold:15 },
+      { store_id:store1.id, medicine_id:M['Limcee 500mg'].id,          batch_number:'LC25H01', mfg_date:daysAgo(15),  exp_date:daysFromNow(540), quantity:400, selling_price:16,  low_stock_threshold:50 },
+      { store_id:store1.id, medicine_id:M['Shelcal 500mg'].id,         batch_number:'SC25I01', mfg_date:daysAgo(10),  exp_date:daysFromNow(540), quantity:100, selling_price:120, low_stock_threshold:15 },
+      { store_id:store1.id, medicine_id:M['Becosules Capsule'].id,     batch_number:'BV25J01', mfg_date:daysAgo(20),  exp_date:daysFromNow(600), quantity:130, selling_price:88,  low_stock_threshold:20 },
+      { store_id:store1.id, medicine_id:M['Electral ORS Sachet'].id,   batch_number:'EP25K01', mfg_date:daysAgo(8),   exp_date:daysFromNow(720), quantity:500, selling_price:20,  low_stock_threshold:60 },
+      { store_id:store1.id, medicine_id:M['Allegra 120mg'].id,         batch_number:'AL25L01', mfg_date:daysAgo(35),  exp_date:daysFromNow(480), quantity:60,  selling_price:180, low_stock_threshold:10 },
+      { store_id:store1.id, medicine_id:M['Betadine Ointment 20g'].id, batch_number:'BD25M01', mfg_date:daysAgo(12),  exp_date:daysFromNow(900), quantity:55,  selling_price:62,  low_stock_threshold:10 },
+      { store_id:store1.id, medicine_id:M['Asthalin Inhaler'].id,      batch_number:'AI25N01', mfg_date:daysAgo(20),  exp_date:daysFromNow(540), quantity:30,  selling_price:128, low_stock_threshold:5  },
+      // Near-expiry for expiry alert demo
+      { store_id:store1.id, medicine_id:M['Strepsils Lozenges'].id,    batch_number:'ST25P01', mfg_date:daysAgo(700), exp_date:daysFromNow(24),  quantity:22,  selling_price:58,  low_stock_threshold:10, status:'active' },
+      // Dead stock: Isabgol — has inventory but will receive NO orders
+      { store_id:store1.id, medicine_id:M['Isabgol Husk 100g'].id,     batch_number:'IH25Q01', mfg_date:daysAgo(60),  exp_date:daysFromNow(480), quantity:45,  selling_price:70,  low_stock_threshold:10 },
+    ],
+  });
+
+  // ── Inventory — Store 2 (Pune) ────────────────────────────────────────────
+  const s2inv = await prisma.storeInventory.createManyAndReturn({
+    data:[
+      { store_id:store2.id, medicine_id:M['Crocin 500mg'].id,          batch_number:'CR25A02', mfg_date:daysAgo(200), exp_date:daysFromNow(500), quantity:300, selling_price:21,  low_stock_threshold:40 },
+      { store_id:store2.id, medicine_id:M['Dolo 650mg'].id,            batch_number:'DL25B02', mfg_date:daysAgo(110), exp_date:daysFromNow(450), quantity:220, selling_price:29,  low_stock_threshold:35 },
+      { store_id:store2.id, medicine_id:M['Pan-D Capsule'].id,         batch_number:'PD25E02', mfg_date:daysAgo(55),  exp_date:daysFromNow(520), quantity:200, selling_price:80,  low_stock_threshold:25 },
+      { store_id:store2.id, medicine_id:M['Digene Syrup 200ml'].id,    batch_number:'DG25F02', mfg_date:daysAgo(40),  exp_date:daysFromNow(600), quantity:70,  selling_price:132, low_stock_threshold:10 },
+      { store_id:store2.id, medicine_id:M['Benadryl Cough 100ml'].id,  batch_number:'BC25G02', mfg_date:daysAgo(35),  exp_date:daysFromNow(380), quantity:80,  selling_price:82,  low_stock_threshold:12 },
+      { store_id:store2.id, medicine_id:M['Strepsils Lozenges'].id,    batch_number:'ST25H02', mfg_date:daysAgo(20),  exp_date:daysFromNow(480), quantity:95,  selling_price:58,  low_stock_threshold:15 },
+      { store_id:store2.id, medicine_id:M['Limcee 500mg'].id,          batch_number:'LC25I02', mfg_date:daysAgo(18),  exp_date:daysFromNow(600), quantity:320, selling_price:17,  low_stock_threshold:40 },
+      { store_id:store2.id, medicine_id:M['Shelcal 500mg'].id,         batch_number:'SC25J02', mfg_date:daysAgo(12),  exp_date:daysFromNow(540), quantity:85,  selling_price:125, low_stock_threshold:12 },
+      { store_id:store2.id, medicine_id:M['Electral ORS Sachet'].id,   batch_number:'EP25K02', mfg_date:daysAgo(6),   exp_date:daysFromNow(720), quantity:450, selling_price:20,  low_stock_threshold:60 },
+      { store_id:store2.id, medicine_id:M['Glucon-D 200g'].id,         batch_number:'GD25L02', mfg_date:daysAgo(22),  exp_date:daysFromNow(360), quantity:110, selling_price:75,  low_stock_threshold:15 },
+      { store_id:store2.id, medicine_id:M['Allegra 120mg'].id,         batch_number:'AL25M02', mfg_date:daysAgo(30),  exp_date:daysFromNow(480), quantity:55,  selling_price:185, low_stock_threshold:10 },
+      { store_id:store2.id, medicine_id:M['Calamine Lotion 100ml'].id, batch_number:'CL25N02', mfg_date:daysAgo(10),  exp_date:daysFromNow(540), quantity:50,  selling_price:45,  low_stock_threshold:8  },
+      { store_id:store2.id, medicine_id:M['Otrivin Nasal 10ml'].id,    batch_number:'OT25O02', mfg_date:daysAgo(28),  exp_date:daysFromNow(360), quantity:60,  selling_price:50,  low_stock_threshold:10 },
+      // Near-expiry item (58 days — hits 60-day warning)
+      { store_id:store2.id, medicine_id:M['Combiflam'].id,             batch_number:'CB25P02', mfg_date:daysAgo(310), exp_date:daysFromNow(58),  quantity:30,  selling_price:33,  low_stock_threshold:10, status:'active' },
+    ],
+  });
+
+  console.log('✅  Inventory created');
+
+  // ── Build lookup: medicine_id → inventory row for each store ─────────────
+  const s1ByMed: Record<string, typeof s1inv[0]> = {};
+  for (const row of s1inv) s1ByMed[row.medicine_id] = row;
+  const s2ByMed: Record<string, typeof s2inv[0]> = {};
+  for (const row of s2inv) s2ByMed[row.medicine_id] = row;
+
+  // ── Order generator ───────────────────────────────────────────────────────
+  let orderSeq = 0;
+
+  async function placeOrder(opts: {
+    consumer: typeof priya;
+    store: typeof store1;
+    invByMed: typeof s1ByMed;
+    daysBack: number;
+    items: { name: string; qty: number }[];
+    deliveryType: 'delivery' | 'pickup';
+    paymentMethod: 'upi' | 'card' | 'cod';
+    status: 'delivered' | 'dispatched' | 'packing' | 'accepted' | 'confirmed' | 'rejected' | 'cancelled';
+    rejectionReason?: string;
+  }) {
+    const { consumer, store, invByMed, daysBack, items, deliveryType, paymentMethod, status, rejectionReason } = opts;
+    orderSeq++;
+
+    const lineItems = items.map(({ name, qty }) => {
+      const med = M[name];
+      const inv = invByMed[med.id];
+      if (!inv) throw new Error(`No inventory for ${name} in store ${store.name}`);
+      const line_total = Number(inv.selling_price) * qty;
+      return { inv, med, qty, line_total };
+    });
+
+    const subtotal = lineItems.reduce((s, l) => s + l.line_total, 0);
+    const totals   = calcTotals(subtotal, deliveryType);
+    const created  = orderDate(daysBack);
+
+    const isTerminal = ['delivered','rejected','cancelled'].includes(status);
+    const accepted_at   = ['delivered','dispatched','packing','accepted'].includes(status) ? new Date(created.getTime() + 8 * 60000) : null;
+    const dispatched_at = ['delivered','dispatched'].includes(status)                       ? new Date(created.getTime() + 25 * 60000) : null;
+    const delivered_at  = status === 'delivered'                                            ? new Date(created.getTime() + 90 * 60000) : null;
+    const cancelled_at  = status === 'cancelled'                                            ? new Date(created.getTime() + 5  * 60000) : null;
+
+    await prisma.order.create({
+      data: {
+        consumer_id: consumer.id, store_id: store.id,
+        delivery_type: deliveryType,
+        delivery_address: deliveryType === 'delivery'
+          ? { line: consumer.name + ' address', city: store.city, pincode: store.pincode }
+          : null,
+        status, payment_method: paymentMethod,
+        payment_status: status === 'rejected' || status === 'cancelled' ? 'refunded' : 'paid',
+        payment_ref: `REF${uid()}`,
+        rejection_reason: rejectionReason || null,
+        ...totals,
+        accepted_at, dispatched_at, delivered_at, cancelled_at,
+        created_at: created,
+        items: {
+          create: lineItems.map(({ inv, med, qty, line_total }) => ({
+            inventory_id:    inv.id,
+            medicine_name:   med.name,
+            salt_composition:med.salt_composition,
+            batch_number:    inv.batch_number,
+            quantity:        qty,
+            unit_price:      inv.selling_price,
+            line_total,
+            mrp_at_order:    med.mrp,
+          })),
+        },
+      },
+    });
   }
 
-  // Order 1 — Priya from Store 1 — DELIVERED (7 days ago)
-  const o1Items = [
-    { inv: s1Inv.find(i => i.medicine_id === med['Crocin 500mg'].id)!, qty: 2 },
-    { inv: s1Inv.find(i => i.medicine_id === med['Limcee 500mg'].id)!, qty: 3 },
-  ];
-  const o1Totals = calcTotals(o1Items.map(i => ({ price: Number(i.inv.selling_price), qty: i.qty })), 'delivery');
-  const order1 = await prisma.order.create({
+  // ── STORE 1 orders (Delhi, last 14 days) ─────────────────────────────────
+  // Day 13 ago
+  await placeOrder({ consumer:priya,  store:store1, invByMed:s1ByMed, daysBack:13, status:'delivered', deliveryType:'delivery', paymentMethod:'upi', items:[{name:'Crocin 500mg',qty:3},{name:'Limcee 500mg',qty:2}] });
+  await placeOrder({ consumer:arjun,  store:store1, invByMed:s1ByMed, daysBack:13, status:'delivered', deliveryType:'pickup',   paymentMethod:'card', items:[{name:'Pan-D Capsule',qty:2},{name:'Gelusil MPS Tablet',qty:1}] });
+
+  // Day 12
+  await placeOrder({ consumer:priya,  store:store1, invByMed:s1ByMed, daysBack:12, status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Dolo 650mg',qty:2},{name:'Benadryl Cough 100ml',qty:1}] });
+  await placeOrder({ consumer:rohit,  store:store1, invByMed:s1ByMed, daysBack:12, status:'delivered', deliveryType:'delivery', paymentMethod:'cod',  items:[{name:'Electral ORS Sachet',qty:6},{name:'Limcee 500mg',qty:3}] });
+  await placeOrder({ consumer:arjun,  store:store1, invByMed:s1ByMed, daysBack:12, status:'rejected',  deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Crocin 500mg',qty:2}], rejectionReason:'Item temporarily unavailable at this batch.' });
+
+  // Day 11
+  await placeOrder({ consumer:priya,  store:store1, invByMed:s1ByMed, daysBack:11, status:'delivered', deliveryType:'pickup',   paymentMethod:'card', items:[{name:'Allegra 120mg',qty:1},{name:'Becosules Capsule',qty:1}] });
+  await placeOrder({ consumer:rohit,  store:store1, invByMed:s1ByMed, daysBack:11, status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Pan-D Capsule',qty:2},{name:'Dolo 650mg',qty:1}] });
+
+  // Day 10
+  await placeOrder({ consumer:arjun,  store:store1, invByMed:s1ByMed, daysBack:10, status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Crocin 500mg',qty:2},{name:'Limcee 500mg',qty:3},{name:'Shelcal 500mg',qty:1}] });
+  await placeOrder({ consumer:priya,  store:store1, invByMed:s1ByMed, daysBack:10, status:'cancelled', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Volini Gel 30g',qty:1}] });
+  await placeOrder({ consumer:ananya, store:store1, invByMed:s1ByMed, daysBack:10, status:'delivered', deliveryType:'pickup',   paymentMethod:'card', items:[{name:'Asthalin Inhaler',qty:1},{name:'Becosules Capsule',qty:2}] });
+
+  // Day 9
+  await placeOrder({ consumer:priya,  store:store1, invByMed:s1ByMed, daysBack:9,  status:'delivered', deliveryType:'delivery', paymentMethod:'card', items:[{name:'Electral ORS Sachet',qty:5},{name:'Dolo 650mg',qty:2}] });
+  await placeOrder({ consumer:rohit,  store:store1, invByMed:s1ByMed, daysBack:9,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Pan-D Capsule',qty:1},{name:'Gelusil MPS Tablet',qty:2}] });
+  await placeOrder({ consumer:arjun,  store:store1, invByMed:s1ByMed, daysBack:9,  status:'rejected',  deliveryType:'pickup',   paymentMethod:'card', items:[{name:'Shelcal 500mg',qty:2}], rejectionReason:'Out of stock on requested batch.' });
+
+  // Day 8
+  await placeOrder({ consumer:ananya, store:store1, invByMed:s1ByMed, daysBack:8,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Crocin 500mg',qty:3},{name:'Benadryl Cough 100ml',qty:1}] });
+  await placeOrder({ consumer:priya,  store:store1, invByMed:s1ByMed, daysBack:8,  status:'delivered', deliveryType:'pickup',   paymentMethod:'upi',  items:[{name:'Allegra 120mg',qty:1},{name:'Limcee 500mg',qty:2}] });
+
+  // Day 7
+  await placeOrder({ consumer:rohit,  store:store1, invByMed:s1ByMed, daysBack:7,  status:'delivered', deliveryType:'delivery', paymentMethod:'cod',  items:[{name:'Electral ORS Sachet',qty:8},{name:'Betadine Ointment 20g',qty:1}] });
+  await placeOrder({ consumer:arjun,  store:store1, invByMed:s1ByMed, daysBack:7,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Dolo 650mg',qty:3},{name:'Pan-D Capsule',qty:1}] });
+  await placeOrder({ consumer:priya,  store:store1, invByMed:s1ByMed, daysBack:7,  status:'delivered', deliveryType:'pickup',   paymentMethod:'card', items:[{name:'Becosules Capsule',qty:1},{name:'Shelcal 500mg',qty:1}] });
+
+  // Day 6
+  await placeOrder({ consumer:ananya, store:store1, invByMed:s1ByMed, daysBack:6,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Crocin 500mg',qty:4},{name:'Limcee 500mg',qty:3}] });
+  await placeOrder({ consumer:rohit,  store:store1, invByMed:s1ByMed, daysBack:6,  status:'delivered', deliveryType:'delivery', paymentMethod:'card', items:[{name:'Volini Gel 30g',qty:1},{name:'Betadine Ointment 20g',qty:1}] });
+
+  // Day 5
+  await placeOrder({ consumer:priya,  store:store1, invByMed:s1ByMed, daysBack:5,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Pan-D Capsule',qty:2},{name:'Dolo 650mg',qty:1}] });
+  await placeOrder({ consumer:arjun,  store:store1, invByMed:s1ByMed, daysBack:5,  status:'delivered', deliveryType:'pickup',   paymentMethod:'upi',  items:[{name:'Electral ORS Sachet',qty:6},{name:'Crocin 500mg',qty:2}] });
+  await placeOrder({ consumer:ananya, store:store1, invByMed:s1ByMed, daysBack:5,  status:'rejected',  deliveryType:'delivery', paymentMethod:'card', items:[{name:'Asthalin Inhaler',qty:1}], rejectionReason:'Store closing early today.' });
+
+  // Day 4
+  await placeOrder({ consumer:rohit,  store:store1, invByMed:s1ByMed, daysBack:4,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Benadryl Cough 100ml',qty:1},{name:'Strepsils Lozenges',qty:1},{name:'Dolo 650mg',qty:2}] });
+  await placeOrder({ consumer:priya,  store:store1, invByMed:s1ByMed, daysBack:4,  status:'delivered', deliveryType:'delivery', paymentMethod:'card', items:[{name:'Allegra 120mg',qty:2},{name:'Limcee 500mg',qty:2}] });
+
+  // Day 3
+  await placeOrder({ consumer:arjun,  store:store1, invByMed:s1ByMed, daysBack:3,  status:'delivered', deliveryType:'pickup',   paymentMethod:'upi',  items:[{name:'Pan-D Capsule',qty:1},{name:'Gelusil MPS Tablet',qty:2}] });
+  await placeOrder({ consumer:ananya, store:store1, invByMed:s1ByMed, daysBack:3,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Crocin 500mg',qty:2},{name:'Shelcal 500mg',qty:1}] });
+  await placeOrder({ consumer:rohit,  store:store1, invByMed:s1ByMed, daysBack:3,  status:'delivered', deliveryType:'delivery', paymentMethod:'cod',  items:[{name:'Electral ORS Sachet',qty:10},{name:'Limcee 500mg',qty:2}] });
+
+  // Day 2
+  await placeOrder({ consumer:priya,  store:store1, invByMed:s1ByMed, daysBack:2,  status:'delivered', deliveryType:'delivery', paymentMethod:'card', items:[{name:'Dolo 650mg',qty:3},{name:'Becosules Capsule',qty:1}] });
+  await placeOrder({ consumer:arjun,  store:store1, invByMed:s1ByMed, daysBack:2,  status:'delivered', deliveryType:'pickup',   paymentMethod:'upi',  items:[{name:'Crocin 500mg',qty:3},{name:'Limcee 500mg',qty:3}] });
+
+  // Day 1
+  await placeOrder({ consumer:rohit,  store:store1, invByMed:s1ByMed, daysBack:1,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Pan-D Capsule',qty:2},{name:'Dolo 650mg',qty:2}] });
+  await placeOrder({ consumer:ananya, store:store1, invByMed:s1ByMed, daysBack:1,  status:'delivered', deliveryType:'delivery', paymentMethod:'card', items:[{name:'Allegra 120mg',qty:1},{name:'Benadryl Cough 100ml',qty:1}] });
+  await placeOrder({ consumer:priya,  store:store1, invByMed:s1ByMed, daysBack:1,  status:'dispatched', deliveryType:'delivery', paymentMethod:'upi', items:[{name:'Crocin 500mg',qty:2},{name:'Electral ORS Sachet',qty:4}] });
+
+  // Today (active orders visible in dashboard)
+  await placeOrder({ consumer:arjun,  store:store1, invByMed:s1ByMed, daysBack:0,  status:'accepted',  deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Pan-D Capsule',qty:1},{name:'Limcee 500mg',qty:2}] });
+  await placeOrder({ consumer:rohit,  store:store1, invByMed:s1ByMed, daysBack:0,  status:'confirmed', deliveryType:'pickup',   paymentMethod:'card', items:[{name:'Dolo 650mg',qty:2}] });
+
+  // ── STORE 2 orders (Pune, last 14 days) ──────────────────────────────────
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:13, status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Crocin 500mg',qty:2},{name:'Electral ORS Sachet',qty:5}] });
+  await placeOrder({ consumer:arjun,  store:store2, invByMed:s2ByMed, daysBack:13, status:'delivered', deliveryType:'pickup',   paymentMethod:'card', items:[{name:'Pan-D Capsule',qty:1},{name:'Dolo 650mg',qty:2}] });
+
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:12, status:'delivered', deliveryType:'delivery', paymentMethod:'cod',  items:[{name:'Glucon-D 200g',qty:2},{name:'Limcee 500mg',qty:3}] });
+  await placeOrder({ consumer:priya,  store:store2, invByMed:s2ByMed, daysBack:12, status:'rejected',  deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Pan-D Capsule',qty:2}], rejectionReason:'Batch requested is out of stock.' });
+
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:11, status:'delivered', deliveryType:'pickup',   paymentMethod:'upi',  items:[{name:'Strepsils Lozenges',qty:2},{name:'Benadryl Cough 100ml',qty:1}] });
+  await placeOrder({ consumer:arjun,  store:store2, invByMed:s2ByMed, daysBack:11, status:'delivered', deliveryType:'delivery', paymentMethod:'card', items:[{name:'Crocin 500mg',qty:3},{name:'Shelcal 500mg',qty:1}] });
+
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:10, status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Allegra 120mg',qty:1},{name:'Limcee 500mg',qty:2}] });
+  await placeOrder({ consumer:priya,  store:store2, invByMed:s2ByMed, daysBack:10, status:'delivered', deliveryType:'pickup',   paymentMethod:'card', items:[{name:'Electral ORS Sachet',qty:6},{name:'Dolo 650mg',qty:1}] });
+
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:9,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Pan-D Capsule',qty:2},{name:'Digene Syrup 200ml',qty:1}] });
+  await placeOrder({ consumer:arjun,  store:store2, invByMed:s2ByMed, daysBack:9,  status:'cancelled', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Glucon-D 200g',qty:1}] });
+
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:8,  status:'delivered', deliveryType:'pickup',   paymentMethod:'card', items:[{name:'Crocin 500mg',qty:4},{name:'Limcee 500mg',qty:2}] });
+  await placeOrder({ consumer:priya,  store:store2, invByMed:s2ByMed, daysBack:8,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Strepsils Lozenges',qty:2},{name:'Otrivin Nasal 10ml',qty:1}] });
+
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:7,  status:'delivered', deliveryType:'delivery', paymentMethod:'cod',  items:[{name:'Electral ORS Sachet',qty:8},{name:'Dolo 650mg',qty:2}] });
+  await placeOrder({ consumer:arjun,  store:store2, invByMed:s2ByMed, daysBack:7,  status:'delivered', deliveryType:'pickup',   paymentMethod:'upi',  items:[{name:'Allegra 120mg',qty:1},{name:'Otrivin Nasal 10ml',qty:1}] });
+
+  await placeOrder({ consumer:priya,  store:store2, invByMed:s2ByMed, daysBack:6,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Pan-D Capsule',qty:2},{name:'Limcee 500mg',qty:3}] });
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:6,  status:'delivered', deliveryType:'delivery', paymentMethod:'card', items:[{name:'Crocin 500mg',qty:3},{name:'Shelcal 500mg',qty:1}] });
+
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:5,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Glucon-D 200g',qty:1},{name:'Electral ORS Sachet',qty:5}] });
+  await placeOrder({ consumer:arjun,  store:store2, invByMed:s2ByMed, daysBack:5,  status:'rejected',  deliveryType:'pickup',   paymentMethod:'card', items:[{name:'Digene Syrup 200ml',qty:2}], rejectionReason:'Item unavailable today.' });
+
+  await placeOrder({ consumer:priya,  store:store2, invByMed:s2ByMed, daysBack:4,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Dolo 650mg',qty:2},{name:'Benadryl Cough 100ml',qty:1}] });
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:4,  status:'delivered', deliveryType:'pickup',   paymentMethod:'upi',  items:[{name:'Strepsils Lozenges',qty:3},{name:'Otrivin Nasal 10ml',qty:1}] });
+
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:3,  status:'delivered', deliveryType:'delivery', paymentMethod:'card', items:[{name:'Crocin 500mg',qty:2},{name:'Limcee 500mg',qty:2},{name:'Pan-D Capsule',qty:1}] });
+  await placeOrder({ consumer:arjun,  store:store2, invByMed:s2ByMed, daysBack:3,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Electral ORS Sachet',qty:4},{name:'Glucon-D 200g',qty:1}] });
+
+  await placeOrder({ consumer:priya,  store:store2, invByMed:s2ByMed, daysBack:2,  status:'delivered', deliveryType:'pickup',   paymentMethod:'upi',  items:[{name:'Allegra 120mg',qty:2},{name:'Calamine Lotion 100ml',qty:1}] });
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:2,  status:'delivered', deliveryType:'delivery', paymentMethod:'card', items:[{name:'Dolo 650mg',qty:3},{name:'Shelcal 500mg',qty:1}] });
+
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:1,  status:'delivered', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Pan-D Capsule',qty:2},{name:'Limcee 500mg',qty:2}] });
+  await placeOrder({ consumer:arjun,  store:store2, invByMed:s2ByMed, daysBack:1,  status:'packing',   deliveryType:'delivery', paymentMethod:'card', items:[{name:'Crocin 500mg',qty:3},{name:'Benadryl Cough 100ml',qty:1}] });
+
+  await placeOrder({ consumer:priya,  store:store2, invByMed:s2ByMed, daysBack:0,  status:'confirmed', deliveryType:'delivery', paymentMethod:'upi',  items:[{name:'Electral ORS Sachet',qty:6},{name:'Dolo 650mg',qty:2}] });
+  await placeOrder({ consumer:sneha,  store:store2, invByMed:s2ByMed, daysBack:0,  status:'accepted',  deliveryType:'pickup',   paymentMethod:'card', items:[{name:'Allegra 120mg',qty:1},{name:'Strepsils Lozenges',qty:2}] });
+
+  console.log(`✅  ${orderSeq} orders created`);
+
+  // ── Blacklisted batch ─────────────────────────────────────────────────────
+  await prisma.blacklistedBatch.create({
     data: {
-      consumer_id: priya.id, store_id: store1.id,
-      delivery_type: 'delivery',
-      delivery_address: { line: '14, Vasant Vihar, Sector 9', city: 'Gurgaon', pincode: '122001' },
-      status: 'delivered', payment_method: 'upi', payment_status: 'paid', payment_ref: 'UPI2026001234',
-      ...o1Totals,
-      accepted_at: daysAgo(7), dispatched_at: daysAgo(7), delivered_at: daysAgo(7),
-      created_at: daysAgo(7),
-      items: {
-        create: o1Items.map(i => ({
-          inventory_id: i.inv.id, medicine_name: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].name,
-          salt_composition: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].salt_composition,
-          batch_number: i.inv.batch_number, quantity: i.qty,
-          unit_price: i.inv.selling_price, line_total: Number(i.inv.selling_price) * i.qty,
-          mrp_at_order: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].mrp,
-        })),
-      },
+      medicine_id: M['Crocin 500mg'].id, batch_number: 'CR24Z999',
+      reason: 'CDSCO Recall Notice RC/2026/0048 — sub-potent batch detected',
+      blacklisted_by: milind.id, blacklisted_at: daysAgo(10),
     },
   });
 
-  // Order 2 — Priya from Store 1 — DELIVERED (14 days ago)
-  const o2Items = [
-    { inv: s1Inv.find(i => i.medicine_id === med['Pan-D Capsule'].id)!, qty: 1 },
-    { inv: s1Inv.find(i => i.medicine_id === med['Gelusil MPS Tablet'].id)!, qty: 2 },
-  ];
-  const o2Totals = calcTotals(o2Items.map(i => ({ price: Number(i.inv.selling_price), qty: i.qty })), 'delivery');
-  await prisma.order.create({
-    data: {
-      consumer_id: priya.id, store_id: store1.id,
-      delivery_type: 'delivery',
-      delivery_address: { line: '14, Vasant Vihar, Sector 9', city: 'Gurgaon', pincode: '122001' },
-      status: 'delivered', payment_method: 'card', payment_status: 'paid', payment_ref: 'CRD2026005678',
-      ...o2Totals,
-      accepted_at: daysAgo(14), dispatched_at: daysAgo(14), delivered_at: daysAgo(14),
-      created_at: daysAgo(14),
-      items: {
-        create: o2Items.map(i => ({
-          inventory_id: i.inv.id,
-          medicine_name: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].name,
-          salt_composition: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].salt_composition,
-          batch_number: i.inv.batch_number, quantity: i.qty,
-          unit_price: i.inv.selling_price, line_total: Number(i.inv.selling_price) * i.qty,
-          mrp_at_order: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].mrp,
-        })),
-      },
-    },
-  });
-
-  // Order 3 — Arjun from Store 1 — DISPATCHED (today)
-  const o3Items = [
-    { inv: s1Inv.find(i => i.medicine_id === med['Dolo 650mg'].id)!, qty: 2 },
-    { inv: s1Inv.find(i => i.medicine_id === med['Benadryl Cough Syrup 100ml'].id)!, qty: 1 },
-    { inv: s1Inv.find(i => i.medicine_id === med['Strepsils Lozenges'] ? med['Strepsils Lozenges'].id === i.medicine_id : false ? i : null)?.id === undefined
-      ? s1Inv.find(i => i.medicine_id === med['Becosules Capsule'].id)!
-      : s1Inv.find(i => i.medicine_id === med['Becosules Capsule'].id)!, qty: 1 },
-  ];
-  const o3Totals = calcTotals(o3Items.map(i => ({ price: Number(i.inv.selling_price), qty: i.qty })), 'pickup');
-  await prisma.order.create({
-    data: {
-      consumer_id: arjun.id, store_id: store1.id,
-      delivery_type: 'pickup', status: 'dispatched',
-      payment_method: 'upi', payment_status: 'paid', payment_ref: 'UPI2026009876',
-      ...o3Totals,
-      accepted_at: daysAgo(1), dispatched_at: new Date(),
-      created_at: daysAgo(1),
-      items: {
-        create: o3Items.map(i => ({
-          inventory_id: i.inv.id,
-          medicine_name: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].name,
-          salt_composition: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].salt_composition,
-          batch_number: i.inv.batch_number, quantity: i.qty,
-          unit_price: i.inv.selling_price, line_total: Number(i.inv.selling_price) * i.qty,
-          mrp_at_order: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].mrp,
-        })),
-      },
-    },
-  });
-
-  // Order 4 — Sneha from Store 2 — DELIVERED (5 days ago)
-  const o4Items = [
-    { inv: s2Inv.find(i => i.medicine_id === med['Electral Powder ORS'].id)!, qty: 5 },
-    { inv: s2Inv.find(i => i.medicine_id === med['Crocin 500mg'].id)!, qty: 2 },
-    { inv: s2Inv.find(i => i.medicine_id === med['Otrivin Nasal Drops 10ml'].id)!, qty: 1 },
-  ];
-  const o4Totals = calcTotals(o4Items.map(i => ({ price: Number(i.inv.selling_price), qty: i.qty })), 'delivery');
-  await prisma.order.create({
-    data: {
-      consumer_id: sneha.id, store_id: store2.id,
-      delivery_type: 'delivery',
-      delivery_address: { line: '22, Koregaon Park, Lane 5', city: 'Pune', pincode: '411001' },
-      status: 'delivered', payment_method: 'cod', payment_status: 'paid',
-      ...o4Totals,
-      accepted_at: daysAgo(5), dispatched_at: daysAgo(5), delivered_at: daysAgo(5),
-      created_at: daysAgo(5),
-      items: {
-        create: o4Items.map(i => ({
-          inventory_id: i.inv.id,
-          medicine_name: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].name,
-          salt_composition: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].salt_composition,
-          batch_number: i.inv.batch_number, quantity: i.qty,
-          unit_price: i.inv.selling_price, line_total: Number(i.inv.selling_price) * i.qty,
-          mrp_at_order: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].mrp,
-        })),
-      },
-    },
-  });
-
-  // Order 5 — Sneha from Store 2 — ACCEPTED (today)
-  const o5Items = [
-    { inv: s2Inv.find(i => i.medicine_id === med['Zincovit Tablet'].id)!, qty: 1 },
-    { inv: s2Inv.find(i => i.medicine_id === med['Cetaphil Cream 80g'].id)!, qty: 1 },
-  ];
-  const o5Totals = calcTotals(o5Items.map(i => ({ price: Number(i.inv.selling_price), qty: i.qty })), 'delivery');
-  await prisma.order.create({
-    data: {
-      consumer_id: sneha.id, store_id: store2.id,
-      delivery_type: 'delivery',
-      delivery_address: { line: '22, Koregaon Park, Lane 5', city: 'Pune', pincode: '411001' },
-      status: 'accepted', payment_method: 'upi', payment_status: 'paid', payment_ref: 'UPI2026011111',
-      ...o5Totals,
-      accepted_at: new Date(), created_at: new Date(),
-      items: {
-        create: o5Items.map(i => ({
-          inventory_id: i.inv.id,
-          medicine_name: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].name,
-          salt_composition: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].salt_composition,
-          batch_number: i.inv.batch_number, quantity: i.qty,
-          unit_price: i.inv.selling_price, line_total: Number(i.inv.selling_price) * i.qty,
-          mrp_at_order: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].mrp,
-        })),
-      },
-    },
-  });
-
-  // Order 6 — Arjun from Store 2 — CONFIRMED (just placed)
-  const o6Items = [
-    { inv: s2Inv.find(i => i.medicine_id === med['Dolo 650mg'].id)!, qty: 3 },
-    { inv: s2Inv.find(i => i.medicine_id === med['Isabgol Husk 100g'].id)!, qty: 1 },
-  ];
-  const o6Totals = calcTotals(o6Items.map(i => ({ price: Number(i.inv.selling_price), qty: i.qty })), 'delivery');
-  await prisma.order.create({
-    data: {
-      consumer_id: arjun.id, store_id: store2.id,
-      delivery_type: 'delivery',
-      delivery_address: { line: 'B-47, Saket, South Delhi', city: 'New Delhi', pincode: '110017' },
-      status: 'confirmed', payment_method: 'upi', payment_status: 'paid', payment_ref: 'UPI2026022222',
-      ...o6Totals,
-      created_at: new Date(),
-      items: {
-        create: o6Items.map(i => ({
-          inventory_id: i.inv.id,
-          medicine_name: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].name,
-          salt_composition: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].salt_composition,
-          batch_number: i.inv.batch_number, quantity: i.qty,
-          unit_price: i.inv.selling_price, line_total: Number(i.inv.selling_price) * i.qty,
-          mrp_at_order: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].mrp,
-        })),
-      },
-    },
-  });
-
-  // Order 7 — Priya from Store 2 — REJECTED (3 days ago, out of stock reason)
-  const o7Items = [
-    { inv: s2Inv.find(i => i.medicine_id === med['Pan-D Capsule'].id)!, qty: 2 },
-  ];
-  const o7Totals = calcTotals(o7Items.map(i => ({ price: Number(i.inv.selling_price), qty: i.qty })), 'pickup');
-  await prisma.order.create({
-    data: {
-      consumer_id: priya.id, store_id: store2.id,
-      delivery_type: 'pickup', status: 'rejected',
-      rejection_reason: 'Temporarily out of stock for this batch. Please try again tomorrow or order from another store.',
-      payment_method: 'upi', payment_status: 'refunded',
-      ...o7Totals,
-      created_at: daysAgo(3),
-      items: {
-        create: o7Items.map(i => ({
-          inventory_id: i.inv.id,
-          medicine_name: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].name,
-          salt_composition: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].salt_composition,
-          batch_number: i.inv.batch_number, quantity: i.qty,
-          unit_price: i.inv.selling_price, line_total: Number(i.inv.selling_price) * i.qty,
-          mrp_at_order: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].mrp,
-        })),
-      },
-    },
-  });
-
-  // Order 8 — Sneha from Store 1 — PACKING
-  const o8Items = [
-    { inv: s1Inv.find(i => i.medicine_id === med['Allegra 120mg'].id)!, qty: 1 },
-    { inv: s1Inv.find(i => i.medicine_id === med['Vicks Vaporub 25g'].id)!, qty: 2 },
-  ];
-  const o8Totals = calcTotals(o8Items.map(i => ({ price: Number(i.inv.selling_price), qty: i.qty })), 'delivery');
-  await prisma.order.create({
-    data: {
-      consumer_id: sneha.id, store_id: store1.id,
-      delivery_type: 'delivery',
-      delivery_address: { line: '22, Koregaon Park, Lane 5', city: 'Pune', pincode: '411001' },
-      status: 'packing', payment_method: 'card', payment_status: 'paid', payment_ref: 'CRD2026033333',
-      ...o8Totals,
-      accepted_at: daysAgo(1), created_at: daysAgo(1),
-      items: {
-        create: o8Items.map(i => ({
-          inventory_id: i.inv.id,
-          medicine_name: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].name,
-          salt_composition: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].salt_composition,
-          batch_number: i.inv.batch_number, quantity: i.qty,
-          unit_price: i.inv.selling_price, line_total: Number(i.inv.selling_price) * i.qty,
-          mrp_at_order: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].mrp,
-        })),
-      },
-    },
-  });
-
-  // Order 9 — Arjun from Store 1 — CANCELLED (2 days ago)
-  const o9Items = [
-    { inv: s1Inv.find(i => i.medicine_id === med['Shelcal 500mg'].id)!, qty: 1 },
-  ];
-  const o9Totals = calcTotals(o9Items.map(i => ({ price: Number(i.inv.selling_price), qty: i.qty })), 'delivery');
-  await prisma.order.create({
-    data: {
-      consumer_id: arjun.id, store_id: store1.id,
-      delivery_type: 'delivery',
-      delivery_address: { line: 'B-47, Saket, South Delhi', city: 'New Delhi', pincode: '110017' },
-      status: 'cancelled', payment_method: 'upi', payment_status: 'refunded',
-      ...o9Totals,
-      cancelled_at: daysAgo(2), created_at: daysAgo(2),
-      items: {
-        create: o9Items.map(i => ({
-          inventory_id: i.inv.id,
-          medicine_name: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].name,
-          salt_composition: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].salt_composition,
-          batch_number: i.inv.batch_number, quantity: i.qty,
-          unit_price: i.inv.selling_price, line_total: Number(i.inv.selling_price) * i.qty,
-          mrp_at_order: med[Object.keys(med).find(k => med[k].id === i.inv.medicine_id)!].mrp,
-        })),
-      },
-    },
-  });
-
-  console.log('✅ 9 orders created across all statuses');
-
-  // ── 12. Notifications ─────────────────────────────────────────────────────
+  // ── Notifications ─────────────────────────────────────────────────────────
   await prisma.notification.createMany({
-    data: [
+    data:[
+      // Rahul (Store 1) — pharmacy notifications
+      { recipient_id:rahul.id,  type:'store.approved',  title:'Pharmacy approved 🎉',           body:'MedPlus Pharmacy — Saket is now live on MedMarket.', channel:'in_app', sent_at:daysAgo(58), read_at:daysAgo(57) },
+      { recipient_id:rahul.id,  type:'order.new',       title:'New order received',             body:'A new order has been placed. Accept within 30 minutes.', channel:'in_app', sent_at:daysAgo(0) },
+      { recipient_id:rahul.id,  type:'expiry.alert',    title:'⚠️ Expiry Alert — 24 days',      body:'Strepsils Lozenges (Batch ST25P01) expires in 24 days. Take action now.', channel:'in_app', sent_at:daysAgo(0) },
+      // Fatima (Store 2)
+      { recipient_id:fatima.id, type:'store.approved',  title:'Pharmacy approved 🎉',           body:'HealthCure Medical Store is now live on MedMarket.', channel:'in_app', sent_at:daysAgo(72), read_at:daysAgo(71) },
+      { recipient_id:fatima.id, type:'order.new',       title:'New order received',             body:'2 new orders waiting. Accept within 30 minutes.', channel:'in_app', sent_at:daysAgo(0) },
+      { recipient_id:fatima.id, type:'expiry.alert',    title:'⚠️ Expiry Alert — 58 days',      body:'Combiflam (Batch CB25P02) expires in 58 days.', channel:'in_app', sent_at:daysAgo(0) },
       // Consumer notifications
-      { recipient_id: priya.id,  type: 'order.accepted',   title: 'Order accepted',               body: 'MedPlus Pharmacy — Saket accepted your order. Preparing your medicines now.', channel: 'in_app', sent_at: daysAgo(7) },
-      { recipient_id: priya.id,  type: 'order.delivered',  title: 'Order delivered ✓',             body: 'Your order has been delivered. Thank you for using MedMarket!', channel: 'in_app', sent_at: daysAgo(7) },
-      { recipient_id: priya.id,  type: 'order.rejected',   title: 'Order rejected',               body: 'Your order from HealthCure Medical Store was rejected: Temporarily out of stock.', channel: 'in_app', sent_at: daysAgo(3) },
-      { recipient_id: arjun.id,  type: 'order.dispatched', title: 'Ready for pickup 🏪',           body: 'Your order at MedPlus Pharmacy — Saket is ready for pickup!', channel: 'in_app', sent_at: new Date() },
-      { recipient_id: sneha.id,  type: 'order.accepted',   title: 'Order accepted',               body: 'HealthCure Medical Store accepted your order and will deliver soon.', channel: 'in_app', sent_at: new Date() },
-      { recipient_id: sneha.id,  type: 'order.delivered',  title: 'Order delivered ✓',             body: 'Your order from HealthCure Medical Store has been delivered. Feel better soon!', channel: 'in_app', sent_at: daysAgo(5) },
-      // Pharmacy notifications
-      { recipient_id: rahul.id,  type: 'order.new',        title: 'New order received',           body: 'A new order has been placed at MedPlus Pharmacy — Saket. Accept within 30 minutes.', channel: 'in_app', sent_at: new Date() },
-      { recipient_id: rahul.id,  type: 'expiry.alert',     title: '⚠️ Expiry Alert — 22 days',    body: 'Avomine Tablet (Batch AV2025Q001) expires in 22 days. Take action now.', channel: 'in_app', sent_at: new Date() },
-      { recipient_id: rahul.id,  type: 'stock.low',        title: '📦 Low Stock Alert',           body: 'Vicks Vaporub 25g has only 6 units remaining (threshold: 10). Consider restocking.', channel: 'in_app', sent_at: new Date() },
-      { recipient_id: fatima.id, type: 'store.approved',   title: 'Your pharmacy is approved! 🎉', body: 'Congratulations! HealthCure Medical Store has been verified and is now live on MedMarket.', channel: 'in_app', sent_at: daysAgo(60) },
-      { recipient_id: fatima.id, type: 'order.new',        title: 'New order received',           body: 'A new order has been placed. Accept within 30 minutes.', channel: 'in_app', sent_at: new Date() },
-      { recipient_id: fatima.id, type: 'expiry.alert',     title: '⚠️ Expiry Alert — 55 days',    body: 'Pudin Hara Pearls (Batch PH2025R002) expires in 55 days.', channel: 'in_app', sent_at: new Date() },
-      { recipient_id: vikram.id, type: 'store.pending',    title: 'Application received',         body: 'Your pharmacy application is under review. We will notify you within 2–3 business days.', channel: 'in_app', sent_at: daysAgo(2) },
-      { recipient_id: deepa.id,  type: 'store.rejected',   title: 'Application not approved',     body: 'Your application for Janta Pharma was not approved. Reason: Drug License document was expired. Please resubmit.', channel: 'in_app', sent_at: daysAgo(5) },
+      { recipient_id:priya.id,  type:'order.delivered', title:'Order delivered ✓',              body:'Your order from MedPlus Pharmacy has been delivered. Thank you!', channel:'in_app', sent_at:daysAgo(2), read_at:daysAgo(2) },
+      { recipient_id:priya.id,  type:'order.accepted',  title:'Order accepted',                 body:'HealthCure Medical Store has accepted your order.', channel:'in_app', sent_at:daysAgo(0) },
+      { recipient_id:sneha.id,  type:'order.delivered', title:'Order delivered ✓',              body:'Your Pune order has been delivered. Feel better soon!', channel:'in_app', sent_at:daysAgo(1), read_at:daysAgo(1) },
+      { recipient_id:sneha.id,  type:'order.accepted',  title:'Order accepted',                 body:'HealthCure Medical Store accepted your order.', channel:'in_app', sent_at:daysAgo(0) },
+      { recipient_id:arjun.id,  type:'order.rejected',  title:'Order rejected',                 body:'Your order was rejected: Out of stock on requested batch. Please try another store.', channel:'in_app', sent_at:daysAgo(9), read_at:daysAgo(9) },
+      // Pending/rejected pharmacy owners
+      { recipient_id:vikram.id, type:'store.pending',   title:'Application received',           body:'Your pharmacy application is under review. We will notify you within 2–3 business days.', channel:'in_app', sent_at:daysAgo(5) },
+      { recipient_id:deepa.id,  type:'store.rejected',  title:'Application not approved',       body:'Janta Medical was not approved. Reason: Drug License was expired. Please resubmit.', channel:'in_app', sent_at:daysAgo(8) },
     ],
   });
-  console.log('✅ Notifications created');
 
-  // ── 13. Complaints ────────────────────────────────────────────────────────
+  // ── Complaints ────────────────────────────────────────────────────────────
   await prisma.complaint.createMany({
-    data: [
+    data:[
       {
-        consumer_id: priya.id,
-        order_id:    order1.id,
-        type:        'order_issue',
-        subject:     'Wrong medicine quantity delivered',
-        body:        'I ordered 3 strips of Limcee but received only 2. Please look into this and arrange for the missing strip to be delivered or refund the amount.',
-        status:      'open',
+        consumer_id:priya.id, type:'overcharged',
+        subject:'Overcharged / Above MRP',
+        body:'The app showed ₹78 for Pan-D but the store charged ₹85. Please look into this pricing discrepancy.',
+        status:'resolved', resolution:'Investigated — pharmacy had set incorrect price. Price corrected to ₹78. Consumer notified and refund processed.',
+        created_at: daysAgo(20),
       },
       {
-        consumer_id: arjun.id,
-        order_id:    null,
-        type:        'pricing',
-        subject:     'Price on app higher than in-store',
-        body:        'I noticed the price for Dolo 650mg on the MedMarket app is ₹28, but the same medicine is ₹25 at the store. Is there a reason for this difference?',
-        status:      'resolved',
-        resolution:  'Investigated and found the pharmacy had updated in-store prices. App price corrected. Consumer has been notified.',
+        consumer_id:sneha.id, type:'late_delivery',
+        subject:'Late Delivery',
+        body:'My order was marked as dispatched yesterday but still not received. It has been over 18 hours.',
+        status:'open', created_at: daysAgo(1),
       },
     ],
   });
-  console.log('✅ Complaints created');
 
-  // ── 14. Audit Logs ────────────────────────────────────────────────────────
+  // ── Audit logs ────────────────────────────────────────────────────────────
   await prisma.auditLog.createMany({
-    data: [
-      { actor_id: milind.id, actor_role: 'admin', action: 'pharmacy.approved',   entity_type: 'pharmacy_store', entity_id: store1.id, metadata: { store_name: 'MedPlus Pharmacy — Saket', verified_at: daysAgo(30).toISOString() }, ip_address: '122.160.10.1', created_at: daysAgo(30) },
-      { actor_id: milind.id, actor_role: 'admin', action: 'pharmacy.approved',   entity_type: 'pharmacy_store', entity_id: store2.id, metadata: { store_name: 'HealthCure Medical Store', verified_at: daysAgo(60).toISOString() }, ip_address: '122.160.10.1', created_at: daysAgo(60) },
-      { actor_id: milind.id, actor_role: 'admin', action: 'pharmacy.rejected',   entity_type: 'pharmacy_store', entity_id: store3.id, metadata: { reason: 'Drug License document was expired.' }, ip_address: '122.160.10.1', created_at: daysAgo(5) },
-      { actor_id: milind.id, actor_role: 'admin', action: 'batch.blacklisted',   entity_type: 'blacklisted_batch', entity_id: med['Crocin 500mg'].id, metadata: { batch: 'CR2024Z999', reason: 'CDSCO Recall Notice RC/2026/0048' }, ip_address: '122.160.10.1', created_at: daysAgo(7) },
-      { actor_id: milind.id, actor_role: 'admin', action: 'medicine.created',    entity_type: 'medicine_master', entity_id: med['Dolo 650mg'].id, metadata: { name: 'Dolo 650mg' }, ip_address: '122.160.10.1', created_at: daysAgo(90) },
+    data:[
+      { actor_id:milind.id, actor_role:'admin', action:'pharmacy.approved', entity_type:'pharmacy_store', entity_id:store1.id, metadata:{ store:'MedPlus Pharmacy — Saket' }, ip_address:'122.160.10.1', created_at:daysAgo(58) },
+      { actor_id:milind.id, actor_role:'admin', action:'pharmacy.approved', entity_type:'pharmacy_store', entity_id:store2.id, metadata:{ store:'HealthCure Medical Store' }, ip_address:'122.160.10.1', created_at:daysAgo(72) },
+      { actor_id:milind.id, actor_role:'admin', action:'pharmacy.rejected', entity_type:'pharmacy_store', entity_id:store2.id, metadata:{ reason:'Drug License expired' },    ip_address:'122.160.10.1', created_at:daysAgo(8) },
+      { actor_id:milind.id, actor_role:'admin', action:'batch.blacklisted', entity_type:'blacklisted_batch', entity_id:M['Crocin 500mg'].id, metadata:{ batch:'CR24Z999', reason:'CDSCO Recall RC/2026/0048' }, ip_address:'122.160.10.1', created_at:daysAgo(10) },
     ],
   });
-  console.log('✅ Audit logs created');
 
   // ── Summary ───────────────────────────────────────────────────────────────
-  console.log('\n' + '─'.repeat(55));
-  console.log('🎉 MedMarket seed complete!\n');
-  console.log('  👤 Admin:');
-  console.log('     Email    : milind@medmarket.in');
-  console.log('     Password : Admin@1234\n');
-  console.log('  🛒 Consumers (all use password: Consumer@1234):');
-  console.log('     priya.sharma@gmail.com');
-  console.log('     arjun.mehta@gmail.com');
-  console.log('     sneha.kulkarni@gmail.com\n');
-  console.log('  🏪 Pharmacy Owners (all use password: Pharma@1234):');
-  console.log('     rahul.gupta@medplus.in      → Approved (MedPlus, Delhi)');
-  console.log('     fatima.sheikh@healthcure.in → Approved (HealthCure, Pune)');
-  console.log('     vikram.nair@apollo.in       → Pending review');
-  console.log('     deepa.joshi@jantapharma.in → Rejected\n');
-  console.log('  💊 30 medicines  |  2 stores with inventory');
-  console.log('  📦 9 orders (delivered/dispatched/packing/accepted/confirmed/rejected/cancelled)');
-  console.log('  ⚠️  2 near-expiry items  |  1 blacklisted batch  |  1 low-stock item');
-  console.log('─'.repeat(55) + '\n');
+  console.log('\n' + '─'.repeat(58));
+  console.log('🎉  Seed complete!\n');
+  console.log('  👤 Admin');
+  console.log('     milind@medmarket.in          Admin@1234\n');
+  console.log('  🏪 Pharmacy Owners              Pharma@1234');
+  console.log('     rahul@medplus.in             → Approved  (Delhi)');
+  console.log('     fatima@healthcure.in         → Approved  (Pune)');
+  console.log('     vikram@apollo.in             → Pending');
+  console.log('     deepa@janta.in               → Rejected\n');
+  console.log('  🛒 Consumers                    Consumer@1234');
+  console.log('     priya@gmail.com   arjun@gmail.com');
+  console.log('     sneha@gmail.com   rohit@gmail.com   ananya@gmail.com\n');
+  console.log(`  💊 20 medicines | ${orderSeq} orders across 14 days`);
+  console.log('  📈 Analytics: 14-day revenue trend with daily variation');
+  console.log('  ⏰ Hourly heatmap: peaks at 9-11am and 7-9pm');
+  console.log('  🔄 Repeat customers: all 5 consumers ordered 3-8x');
+  console.log('  ⚠️  Expiry alerts: 2 near-expiry batches (24d & 58d)');
+  console.log('  📦 Dead stock: Isabgol (Store 1) — no orders in 14 days');
+  console.log('─'.repeat(58) + '\n');
 }
 
 main()
