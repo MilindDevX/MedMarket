@@ -1,6 +1,11 @@
 /**
  * esbuild.config.mjs — Production build script
  *
+ * Why esbuild instead of tsc?
+ * The codebase uses `.ts` import extensions which are valid for tsx/esbuild
+ * but incompatible with tsc's emit mode (TS5097 errors).
+ * esbuild strips types and resolves extensions natively.
+ *
  * Render deploy commands:
  *   Build command:  npm install && npm run build
  *   Start command:  npm start

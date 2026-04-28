@@ -90,3 +90,75 @@ export async function updateMyStore(req: Request, res: Response) {
   });
   return successResponse(res, updated, 'Store updated');
 }
+
+/**
+ * GET /api/v1/pharmacy/complaints
+ * Returns all order-category complaints filed against orders from this pharmacy.
+ */
+export async function getMyComplaints(req: Request, res: Response) {
+  try {
+    const store = await prisma.pharmacyStore.findFirst({
+      where: { owner_id: req.userId },
+      select: { id: true },
+    });
+    if (!store) return errorResponse(res, 'Store not found', 404);
+
+    const complaints = await prisma.complaint.findMany({
+      where: {
+        category: 'order',
+        order: { store_id: store.id },
+      },
+      include: {
+        consumer: { select: { id: true, name: true, mobile: true } },
+        order:    { select: { id: true, status: true, total_amount: true, created_at: true } },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    return successResponse(res, complaints, 'Complaints fetched');
+  } catch (err) {
+    console.error('getMyComplaints error:', err);
+    return errorResponse(res, 'Something went wrong', 500);
+  }
+}
+
+/**
+ * PATCH /api/v1/pharmacy/complaints/:id/resolve
+ * Pharmacy marks a complaint as resolved with a resolution note.
+ */
+export async function resolveMyComplaint(req: Request, res: Response) {
+  try {
+    const id  = req.params.id as string;
+    const { resolution } = req.body;
+
+    if (!resolution?.trim()) {
+      return errorResponse(res, 'Resolution note is required', 400);
+    }
+
+    const store = await prisma.pharmacyStore.findFirst({
+      where: { owner_id: req.userId },
+      select: { id: true },
+    });
+    if (!store) return errorResponse(res, 'Store not found', 404);
+
+    // Verify the complaint belongs to an order from this store
+    const complaint = await prisma.complaint.findFirst({
+      where: {
+        id,
+        category: 'order',
+        order: { store_id: store.id },
+      },
+    });
+    if (!complaint) return errorResponse(res, 'Complaint not found', 404);
+
+    const updated = await prisma.complaint.update({
+      where: { id },
+      data: { status: 'resolved', resolution: resolution.trim() },
+    });
+
+    return successResponse(res, updated, 'Complaint resolved');
+  } catch (err) {
+    console.error('resolveMyComplaint error:', err);
+    return errorResponse(res, 'Something went wrong', 500);
+  }
+}

@@ -191,7 +191,6 @@ export async function listComplaints(req: Request, res: Response) {
     return errorResponse(res, 'Something went wrong', 500);
   }
 }
-
 export async function updateComplaint(req: Request, res: Response) {
   try {
     const id  = req.params.id as string;

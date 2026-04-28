@@ -23,7 +23,7 @@ export function PharmacyGuard({ children }) {
   if (pharmacyStatus === 'pending' || pharmacyStatus === 'rejected') {
     return <Navigate to="/pharmacy/pending" replace />;
   }
-  
+
   if (pharmacyStatus === 'suspended') {
     return <Navigate to="/pharmacy/suspended" replace />;
   }

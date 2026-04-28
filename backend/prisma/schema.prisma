@@ -320,6 +320,7 @@ model Order {
   updated_at   DateTime    @updatedAt
   cancelled_at DateTime?
   items        OrderItem[]
+  complaints   Complaint[]
 
   @@index([consumer_id])
   @@index([store_id])
@@ -429,6 +430,8 @@ model Complaint {
   id          String   @id @default(uuid())
   consumer_id String
   order_id    String?
+  store_id    String?
+  category    String   @default("order")
   type        String
   subject     String
   body        String
@@ -436,6 +439,7 @@ model Complaint {
   resolution  String?
   created_at  DateTime @default(now())
   consumer    User     @relation(fields: [consumer_id], references: [id])
+  order       Order?   @relation(fields: [order_id], references: [id])
 }
 
 model PlatformSettings {

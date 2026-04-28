@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard, Package, AlertTriangle, ShoppingBag,
-  BarChart2, Tag, Store, Bell, LogOut, ChevronRight, Menu, X
+  BarChart2, Tag, Store, Bell, LogOut, ChevronRight, Menu, X, MessageSquare
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import { useNotifications } from '../hooks/useNotifications';
@@ -17,6 +17,7 @@ const navItems = [
   { to: '/pharmacy/analytics',       icon: BarChart2,       label: 'Analytics',      end: false },
   { to: '/pharmacy/pricing',         icon: Tag,             label: 'Pricing',        end: false },
   { to: '/pharmacy/notifications',   icon: Bell,            label: 'Notifications',  end: false },
+  { to: '/pharmacy/complaints',      icon: MessageSquare,   label: 'Complaints',     end: false },
   { to: '/pharmacy/profile',         icon: Store,           label: 'Store Profile',  end: false },
 ];
 

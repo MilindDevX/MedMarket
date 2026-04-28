@@ -23,7 +23,6 @@ const ConsumerSignup = lazy(() => import('./pages/public/ConsumerSignup'));
 // Pharmacy
 const PharmacyRegister      = lazy(() => import('./pages/pharmacy/PharmacyRegister'));
 const PharmacyPending       = lazy(() => import('./pages/pharmacy/PharmacyPending'));
-// ADDED: Suspended page for pharmacies whose accounts have been suspended by admin.
 const PharmacySuspended     = lazy(() => import('./pages/pharmacy/PharmacySuspended'));
 const PharmacyDashboard     = lazy(() => import('./pages/pharmacy/PharmacyDashboard'));
 const PharmacyInventory     = lazy(() => import('./pages/pharmacy/PharmacyInventory'));
@@ -33,6 +32,7 @@ const PharmacyAnalytics     = lazy(() => import('./pages/pharmacy/PharmacyAnalyt
 const PharmacyPricing       = lazy(() => import('./pages/pharmacy/PharmacyPricing'));
 const PharmacyStoreProfile  = lazy(() => import('./pages/pharmacy/PharmacyStoreProfile'));
 const PharmacyNotifications = lazy(() => import('./pages/pharmacy/PharmacyNotifications'));
+const PharmacyComplaints    = lazy(() => import('./pages/pharmacy/PharmacyComplaints'));
 
 // Admin
 const AdminDashboard         = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -59,7 +59,6 @@ const ConsumerNotifications = lazy(() => import('./pages/consumer/ConsumerNotifi
 const OrderTracking         = lazy(() => import('./pages/consumer/OrderTracking'));
 const ConsumerProfile       = lazy(() => import('./pages/consumer/ConsumerProfile'));
 
-// ── Suspense fallback ──
 function PageLoader() {
   return (
     <div style={{
@@ -112,6 +111,7 @@ export default function App() {
             <Route path="pricing"          element={<PharmacyPricing />} />
             <Route path="profile"          element={<PharmacyStoreProfile />} />
             <Route path="notifications"    element={<PharmacyNotifications />} />
+            <Route path="complaints"       element={<PharmacyComplaints />} />
           </Route>
 
           {/* ── Admin panel ── */}

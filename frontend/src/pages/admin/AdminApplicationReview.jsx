@@ -58,7 +58,8 @@ export default function AdminApplicationReview() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  // toast is a stable Zustand store reference — omitting it is intentional
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchApp(); }, [fetchApp]);
 
