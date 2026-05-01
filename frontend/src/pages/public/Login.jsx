@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Store, Shield, ArrowRight, Eye, EyeOff, Phone, Mail } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
+import GoogleSignInButton from '../../components/ui/GoogleSignInButton';
 import styles from './Login.module.css';
 
 const roles = [
@@ -23,8 +24,8 @@ export default function Login() {
   const [error,         setError]         = useState('');
   const [isDeactivated, setIsDeactivated] = useState(false);
 
-  const { login } = useAuthStore();
-  const navigate  = useNavigate();
+  const { login, googleLogin } = useAuthStore();
+  const navigate = useNavigate();
 
   const handleRoleSelect = (roleId) => {
     setSelectedRole(roleId);
@@ -32,6 +33,16 @@ export default function Login() {
     setIsDeactivated(false);
     setEmail('');
     setPassword('');
+  };
+
+  const doNavigate = (user) => {
+    if (user.role === 'consumer') navigate('/consumer/home');
+    else if (user.role === 'pharmacy_owner') {
+      const status = useAuthStore.getState().pharmacyStatus;
+      if (status === 'pending' || status === 'rejected') navigate('/pharmacy/pending');
+      else if (status === 'suspended') navigate('/pharmacy/suspended');
+      else navigate('/pharmacy/dashboard');
+    } else navigate('/admin/dashboard');
   };
 
   const handleLogin = async (e) => {
@@ -45,13 +56,7 @@ export default function Login() {
 
     try {
       const user = await login(email, password);
-
-      const roleMatches = (
-        (selectedRole === 'consumer'       && user.role === 'consumer') ||
-        (selectedRole === 'pharmacy_owner' && user.role === 'pharmacy_owner') ||
-        (selectedRole === 'admin'          && user.role === 'admin')
-      );
-
+      const roleMatches = selectedRole === user.role;
       if (!roleMatches) {
         await useAuthStore.getState().logout();
         const roleLabel = { consumer:'Patient', pharmacy_owner:'Pharmacy', admin:'Admin' };
@@ -59,26 +64,26 @@ export default function Login() {
         setLoading(false);
         return;
       }
-
-      if (user.role === 'consumer') navigate('/consumer/home');
-      else if (user.role === 'pharmacy_owner') {
-        const status = useAuthStore.getState().pharmacyStatus;
-        if (status === 'pending' || status === 'rejected') navigate('/pharmacy/pending');
-        else if (status === 'suspended') navigate('/pharmacy/suspended');
-        else navigate('/pharmacy/dashboard');
-      }
-      else navigate('/admin/dashboard');
+      doNavigate(user);
     } catch (err) {
-      if (err.message === 'DEACTIVATED') {
-        setIsDeactivated(true);
-      } else {
-        // Show the real error — wrong password, invalid credentials, etc.
-        setError(err.message || 'Invalid credentials. Please try again.');
-      }
+      if (err.message === 'DEACTIVATED') setIsDeactivated(true);
+      else setError(err.message || 'Invalid credentials. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  const handleGoogleSuccess = async (accessToken) => {
+    setError('');
+    try {
+      const user = await googleLogin(accessToken, selectedRole === 'pharmacy_owner' ? 'pharmacy_owner' : 'consumer');
+      doNavigate(user);
+    } catch (err) {
+      setError(err.message || 'Google sign-in failed. Please try again.');
+    }
+  };
+
+  const showGoogleButton = selectedRole === 'consumer' || selectedRole === 'pharmacy_owner';
 
   return (
     <div className={styles.page}>
@@ -125,6 +130,24 @@ export default function Login() {
               </motion.button>
             ))}
           </div>
+
+          <AnimatePresence>
+            {showGoogleButton && (
+              <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
+                style={{ marginTop:'var(--sp-4)' }}>
+                <GoogleSignInButton
+                  onSuccess={handleGoogleSuccess}
+                  onError={msg => setError(msg)}
+                  label={`Continue with Google${selectedRole === 'pharmacy_owner' ? ' (Pharmacy)' : ''}`}
+                />
+                <div style={{ display:'flex', alignItems:'center', gap:'var(--sp-3)', margin:'var(--sp-4) 0' }}>
+                  <div style={{ flex:1, height:1, background:'var(--ink-200)' }} />
+                  <span style={{ fontSize:12, color:'var(--ink-400)', fontWeight:500 }}>or sign in with email</span>
+                  <div style={{ flex:1, height:1, background:'var(--ink-200)' }} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence>
             {selectedRole && (
@@ -196,3 +219,5 @@ export default function Login() {
     </div>
   );
 }
+
+

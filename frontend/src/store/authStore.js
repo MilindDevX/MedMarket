@@ -66,6 +66,23 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
+  googleLogin: async (idToken, role) => {
+    set({ loading: true, error: null });
+    try {
+      clearTokens();
+      const res = await api.post('/auth/google', { idToken, role });
+      saveTokens(res.data.accessToken, res.data.refreshToken);
+      saveUser(res.data.user);
+      set({ user: res.data.user, role: res.data.user.role, isAuthenticated: true, pharmacyStatus: null, loading: false });
+      if (res.data.user.role === 'pharmacy_owner') await get()._fetchPharmacyStatus();
+      return res.data.user;
+    } catch (err) {
+      const msg = friendlyLoginError(err.message);
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
   logout: async () => {
     try {
       const { refreshToken } = getTokens();

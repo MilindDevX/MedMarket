@@ -4,12 +4,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, ArrowRight, CheckCircle, ShieldCheck, MapPin } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
+import GoogleSignInButton from '../../components/ui/GoogleSignInButton';
 import styles from './ConsumerSignup.module.css';
 
 const STEPS = ['Account', 'Personal', 'Location'];
 
-// Rejects disposable-looking emails: must have a real TLD (≥2 chars),
-// local part ≥2 chars, domain label ≥2 chars, no consecutive dots.
 function isRealEmail(email) {
   return /^[a-zA-Z0-9._%+-]{2,}@[a-zA-Z0-9.-]{2,}\.[a-zA-Z]{2,}$/.test(email)
     && !email.includes('..')
@@ -17,11 +16,9 @@ function isRealEmail(email) {
     && email.split('@')[1].split('.')[0].length >= 2;
 }
 
-// Rejects names that are only punctuation/symbols/whitespace or too short
 function isRealName(name) {
   const trimmed = name.trim();
   if (trimmed.length < 2) return false;
-  // Must contain at least 2 actual letters
   return (trimmed.match(/\p{L}/gu) || []).length >= 2;
 }
 
@@ -43,13 +40,14 @@ function Field({ label, id, type = 'text', value, onChange, error, placeholder, 
 export default function ConsumerSignup() {
   usePageTitle('Create Account');
   const navigate = useNavigate();
-  const { register } = useAuthStore();
+  const { register, googleLogin } = useAuthStore();
 
-  const [step,        setStep]        = useState(0);
-  const [loading,     setLoading]     = useState(false);
-  const [showPassword,setShowPassword]= useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [errors,      setErrors]      = useState({});
+  const [step,         setStep]         = useState(0);
+  const [loading,      setLoading]      = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm,  setShowConfirm]  = useState(false);
+  const [errors,       setErrors]       = useState({});
+  const [googleError,  setGoogleError]  = useState('');
 
   const [form, setForm] = useState({
     email: '', password: '', confirm: '',
@@ -108,7 +106,6 @@ export default function ConsumerSignup() {
       });
       navigate('/consumer/home');
     } catch (err) {
-      // Show error on the correct step
       const msg = err.message || '';
       if (msg.toLowerCase().includes('email') || msg.includes('409') || msg.includes('already')) {
         setStep(0);
@@ -118,6 +115,16 @@ export default function ConsumerSignup() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (accessToken) => {
+    setGoogleError('');
+    try {
+      await googleLogin(accessToken, 'consumer');
+      navigate('/consumer/home');
+    } catch (err) {
+      setGoogleError(err.message || 'Google sign-up failed. Please try again.');
     }
   };
 
@@ -168,7 +175,6 @@ export default function ConsumerSignup() {
             ))}
           </div>
 
-          {/* Global submit error banner */}
           <AnimatePresence>
             {errors.submit && (
               <motion.div initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
@@ -182,7 +188,25 @@ export default function ConsumerSignup() {
             {step === 0 && (
               <motion.div key="s0" initial={{ opacity:0, x:24 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-24 }} transition={{ type:'spring', stiffness:320, damping:28 }}>
                 <h2 className={styles.stepTitle}>Create your account</h2>
-                <p className={styles.stepSub}>Start with your email and a secure password</p>
+                <p className={styles.stepSub}>Start with Google or use your email</p>
+
+                <div style={{ marginBottom: 'var(--sp-4)' }}>
+                  <GoogleSignInButton
+                    onSuccess={handleGoogleSuccess}
+                    onError={msg => setGoogleError(msg)}
+                    label="Sign up with Google"
+                  />
+                  {googleError && (
+                    <p style={{ fontSize:12, color:'var(--danger)', marginTop:6, fontWeight:500 }}>{googleError}</p>
+                  )}
+                </div>
+
+                <div style={{ display:'flex', alignItems:'center', gap:'var(--sp-3)', marginBottom:'var(--sp-4)' }}>
+                  <div style={{ flex:1, height:1, background:'var(--ink-200)' }} />
+                  <span style={{ fontSize:12, color:'var(--ink-400)', fontWeight:500 }}>or sign up with email</span>
+                  <div style={{ flex:1, height:1, background:'var(--ink-200)' }} />
+                </div>
+
                 <div className={styles.fields}>
                   <Field id="email" label="Email address" type="email"
                     value={form.email} onChange={v => setField('email', v)}
@@ -266,3 +290,5 @@ export default function ConsumerSignup() {
     </div>
   );
 }
+
+
