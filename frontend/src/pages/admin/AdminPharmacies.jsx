@@ -6,6 +6,7 @@ import { Search, ShieldOff } from 'lucide-react';
 import { useAdminPharmacies } from '../../hooks/useAdminPharmacies';
 import Badge from '../../components/ui/Badge';
 import { SkeletonTable } from '../../components/ui/Skeleton';
+import Pagination from '../../components/ui/Pagination';
 import useToastStore from '../../store/toastStore';
 import styles from './AdminPharmacies.module.css';
 
@@ -15,6 +16,8 @@ export default function AdminPharmacies() {
   usePageTitle('Pharmacy Applications');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [page,   setPage]   = useState(1);
+  const PAGE_SIZE = 15;
   const toast = useToastStore();
   const { apps, loading, approve, reject, suspend } = useAdminPharmacies(filter === 'all' ? '' : filter);
 
@@ -22,6 +25,8 @@ export default function AdminPharmacies() {
     const q = search.toLowerCase();
     return !search || a.name?.toLowerCase().includes(q) || a.owner?.name?.toLowerCase().includes(q);
   });
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const counts = {
     all:       apps.length,
@@ -89,7 +94,7 @@ export default function AdminPharmacies() {
             ))}
           </tr></thead>
           <tbody>
-            {filtered.map((app, i) => (
+            {paginated.map((app, i) => (
               <motion.tr key={app.id} className={styles.tr}
                 initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:i*0.05 }}>
                 <td className={styles.td}>
@@ -123,6 +128,7 @@ export default function AdminPharmacies() {
         </table>
         {filtered.length === 0 && <div className={styles.empty}>No pharmacies match your filters.</div>}
       </div>
+      <Pagination page={page} totalPages={totalPages} onPageChange={p => setPage(p)} />
     </div>
   );
 }

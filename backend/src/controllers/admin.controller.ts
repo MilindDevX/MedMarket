@@ -179,6 +179,80 @@ export async function getAllOrders(req: Request, res: Response) {
   }
 }
 
+export async function getPharmacyAnalytics(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const store = await prisma.pharmacyStore.findUnique({
+      where: { id },
+      select: { id: true, name: true, city: true, status: true },
+    });
+    if (!store) return errorResponse(res, 'Store not found', 404);
+
+    const orders = await prisma.order.findMany({
+      where: { store_id: id },
+      include: { items: true },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const delivered  = orders.filter(o => o.status === 'delivered');
+    const rejected   = orders.filter(o => o.status === 'rejected');
+    const cancelled  = orders.filter(o => o.status === 'cancelled');
+    const totalGmv   = delivered.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+    const avgOrder   = delivered.length > 0 ? totalGmv / delivered.length : 0;
+    const terminal   = delivered.length + rejected.length + cancelled.length;
+    const fulfillmentRate = terminal > 0 ? Math.round(delivered.length / terminal * 100) : 0;
+    const rejectionRate   = terminal > 0 ? Math.round(rejected.length  / terminal * 100) : 0;
+
+    // 14-day GMV trend
+    const gmvByDay = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const label   = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const dateStr = d.toISOString().slice(0, 10);
+      const rev     = delivered
+        .filter(o => o.created_at.toISOString().slice(0, 10) === dateStr)
+        .reduce((s, o) => s + Number(o.total_amount || 0), 0);
+      const ordCnt  = orders.filter(o => o.created_at.toISOString().slice(0, 10) === dateStr).length;
+      gmvByDay.push({ day: label, gmv: Math.round(rev), orders: ordCnt });
+    }
+
+    // Top medicines by units sold
+    const medMap: Record<string, { name: string; units: number; revenue: number }> = {};
+    delivered.forEach(o => {
+      o.items.forEach((item: any) => {
+        const key = item.medicine_name;
+        if (!medMap[key]) medMap[key] = { name: key, units: 0, revenue: 0 };
+        medMap[key].units   += item.quantity;
+        medMap[key].revenue += Number(item.line_total || 0);
+      });
+    });
+    const topMedicines = Object.values(medMap)
+      .sort((a, b) => b.units - a.units)
+      .slice(0, 6);
+
+    // Order status distribution
+    const statusDist: Record<string, number> = {};
+    orders.forEach(o => { statusDist[o.status] = (statusDist[o.status] || 0) + 1; });
+    const orderStatusDist = Object.entries(statusDist).map(([name, value]) => ({ name, value }));
+
+    return successResponse(res, {
+      store,
+      totalOrders: orders.length,
+      totalGmv: Math.round(totalGmv),
+      avgOrder: Math.round(avgOrder),
+      fulfillmentRate,
+      rejectionRate,
+      gmvByDay,
+      topMedicines,
+      orderStatusDist,
+    }, 'Pharmacy analytics fetched');
+  } catch (err) {
+    console.error('getPharmacyAnalytics error:', err);
+    return errorResponse(res, 'Something went wrong', 500);
+  }
+}
+
 export async function listComplaints(req: Request, res: Response) {
   try {
     const complaints = await prisma.complaint.findMany({

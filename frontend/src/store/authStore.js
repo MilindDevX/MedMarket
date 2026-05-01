@@ -75,7 +75,7 @@ const useAuthStore = create((set, get) => ({
       saveUser(res.data.user);
       set({ user: res.data.user, role: res.data.user.role, isAuthenticated: true, pharmacyStatus: null, loading: false });
       if (res.data.user.role === 'pharmacy_owner') await get()._fetchPharmacyStatus();
-      return res.data.user;
+      return { user: res.data.user, isNew: res.data.isNew === true };
     } catch (err) {
       const msg = friendlyLoginError(err.message);
       set({ error: msg, loading: false });

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Package, ChevronRight, Store, X, XCircle } from 'lucide-react';
 import { useOrders } from '../../hooks/useOrders';
 import useToastStore from '../../store/toastStore';
+import Pagination from '../../components/ui/Pagination';
 
 const statusConfig = {
   confirmed:  { label:'Confirmed',      color:'var(--blue-700)',     bg:'var(--blue-50)',       cancelable:true  },
@@ -20,6 +21,8 @@ export default function MyOrders() {
   usePageTitle('My Orders');
   const [tab, setTab]                   = useState('active');
   const [cancelTarget, setCancelTarget] = useState(null);
+  const [page, setPage]                 = useState(1);
+  const PAGE_SIZE = 10;
   const navigate = useNavigate();
   const toast    = useToastStore();
   const { orders, loading, error, cancelOrder } = useOrders();
@@ -29,6 +32,8 @@ export default function MyOrders() {
       ? !['delivered','cancelled','rejected'].includes(o.status)
       : ['delivered','cancelled','rejected'].includes(o.status)
   );
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const handleCancel = async () => {
     try {
@@ -85,7 +90,7 @@ export default function MyOrders() {
 
       {!loading && !error && filtered.length > 0 && (
         <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-3)' }}>
-          {filtered.map((order, i) => {
+          {paginated.map((order, i) => {
             const { label, color, bg, cancelable } = statusConfig[order.status] || statusConfig.confirmed;
             return (
               <motion.div key={order.id} style={card}
@@ -134,6 +139,8 @@ export default function MyOrders() {
           })}
         </div>
       )}
+      
+      <Pagination page={page} totalPages={totalPages} onPageChange={p => setPage(p)} />
 
       {/* Cancel confirmation modal */}
       <AnimatePresence>

@@ -76,7 +76,12 @@ export default function Login() {
   const handleGoogleSuccess = async (accessToken) => {
     setError('');
     try {
-      const user = await googleLogin(accessToken, selectedRole === 'pharmacy_owner' ? 'pharmacy_owner' : 'consumer');
+      const { user, isNew } = await googleLogin(accessToken, selectedRole === 'pharmacy_owner' ? 'pharmacy_owner' : 'consumer');
+      // New pharmacy owners go straight to registration — they have no store yet
+      if (isNew && user.role === 'pharmacy_owner') {
+        navigate('/pharmacy/register');
+        return;
+      }
       doNavigate(user);
     } catch (err) {
       setError(err.message || 'Google sign-in failed. Please try again.');

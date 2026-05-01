@@ -10,6 +10,7 @@ import {
 import { useAdminPharmacies } from '../../hooks/useAdminPharmacies';
 import { useAdminOrders } from '../../hooks/useAdminOrders';
 import { useAdminUsers } from '../../hooks/useAdminUsers';
+import { usePharmacyAnalytics } from '../../hooks/usePharmacyAnalytics';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 
 const fmtMoney = (v) => {
@@ -33,6 +34,13 @@ export default function AdminAnalytics() {
   const { apps,   loading: appsLoading   } = useAdminPharmacies('');
   const { orders, loading: ordersLoading } = useAdminOrders();
   const { users,  loading: usersLoading  } = useAdminUsers();
+  
+  const [selectedPharmacyId, setSelectedPharmacyId] = useState('');
+  const { 
+    analytics: pharmacyStats, 
+    loading: pharmacyLoading 
+  } = usePharmacyAnalytics(selectedPharmacyId);
+
   const loading = appsLoading || ordersLoading || usersLoading;
 
   const stats = useMemo(() => {
@@ -125,6 +133,7 @@ export default function AdminAnalytics() {
       avgTurnaround: Math.round(avgTurnaround),
       totalConsumers, activationRate,
       gmvByDay, cityRanking, topMedicines, storeStatusDist, regByDay,
+      approvedStoresList: apps.filter(a => a.status === 'approved')
     };
   }, [apps, orders, users]);
 
@@ -332,6 +341,55 @@ export default function AdminAnalytics() {
           </div>
         </div>
       </div>
+      {/* ── Pharmacy Breakdown ── */}
+      <div style={{ ...card, marginTop:'var(--sp-5)' }}>
+        <div style={{ ...cardTitle, display:'flex', justifyContent:'space-between', borderBottom:'1px solid var(--ink-100)', paddingBottom:'var(--sp-3)', marginBottom:'var(--sp-4)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <Store size={17} strokeWidth={1.8} style={{ color:'var(--blue-700)' }} />
+            Pharmacy Breakdown
+          </div>
+          <select 
+            value={selectedPharmacyId} 
+            onChange={e => setSelectedPharmacyId(e.target.value)}
+            style={{ padding:'6px 12px', borderRadius:'var(--r-sm)', border:'1px solid var(--ink-200)', fontSize:13, fontFamily:'var(--font-body)', outline:'none', color: selectedPharmacyId ? 'var(--ink-900)' : 'var(--ink-500)', background:'var(--white)', minWidth:200 }}>
+            <option value="">Select a pharmacy...</option>
+            {/* Using active stores from the dashboard stats for the dropdown options */}
+            {stats.approvedStoresList?.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {!selectedPharmacyId ? (
+          <div style={{ textAlign:'center', padding:'var(--sp-8)', color:'var(--ink-400)', fontSize:14 }}>
+            Select a pharmacy above to view its detailed performance analytics.
+          </div>
+        ) : pharmacyLoading ? (
+          <div style={{ textAlign:'center', padding:'var(--sp-8)', color:'var(--ink-400)' }}>Loading pharmacy stats...</div>
+        ) : pharmacyStats ? (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:'var(--sp-4)' }}>
+            <div style={{ padding:'var(--sp-4)', background:'var(--ink-50)', borderRadius:12 }}>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:'var(--ink-500)', marginBottom:4 }}>Total GMV</div>
+              <div style={{ fontSize:20, fontWeight:700, color:'var(--green-700)' }}>{fmtMoney(pharmacyStats.total_gmv)}</div>
+            </div>
+            <div style={{ padding:'var(--sp-4)', background:'var(--ink-50)', borderRadius:12 }}>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:'var(--ink-500)', marginBottom:4 }}>Total Orders</div>
+              <div style={{ fontSize:20, fontWeight:700, color:'var(--blue-700)' }}>{pharmacyStats.total_orders}</div>
+            </div>
+            <div style={{ padding:'var(--sp-4)', background:'var(--ink-50)', borderRadius:12 }}>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:'var(--ink-500)', marginBottom:4 }}>Fulfillment Rate</div>
+              <div style={{ fontSize:20, fontWeight:700, color:'var(--success-dark)' }}>{pharmacyStats.fulfillment_rate}%</div>
+            </div>
+            <div style={{ padding:'var(--sp-4)', background:'var(--ink-50)', borderRadius:12 }}>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:'var(--ink-500)', marginBottom:4 }}>Complaints</div>
+              <div style={{ fontSize:20, fontWeight:700, color: pharmacyStats.complaints_count > 0 ? 'var(--warning-dark)' : 'var(--ink-900)' }}>{pharmacyStats.complaints_count}</div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign:'center', padding:'var(--sp-8)', color:'var(--danger)', fontSize:14 }}>Failed to load stats.</div>
+        )}
+      </div>
+
     </div>
   );
 }

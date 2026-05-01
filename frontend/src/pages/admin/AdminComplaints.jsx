@@ -7,6 +7,7 @@ import Badge from '../../components/ui/Badge';
 import useToastStore from '../../store/toastStore';
 import { api } from '../../utils/api';
 import { SkeletonTable } from '../../components/ui/Skeleton';
+import Pagination from '../../components/ui/Pagination';
 
 const typeLabels = {
   wrong_medicine:   'Wrong Medicine',
@@ -35,6 +36,8 @@ export default function AdminComplaints() {
   const [selected,   setSelected]     = useState(null);
   const [resolution, setResolution]   = useState('');
   const [resolving,  setResolving]    = useState(false);
+  const [page,       setPage]         = useState(1);
+  const PAGE_SIZE = 15;
   const toast = useToastStore();
 
   const fetchComplaints = useCallback(() => {
@@ -59,6 +62,8 @@ export default function AdminComplaints() {
     const matchStatus = statusFilter === 'all' || c.status === statusFilter;
     return matchSearch && matchStatus;
   });
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const handleUpdateStatus = async (id, status, resolutionText) => {
     setResolving(true);
@@ -126,7 +131,7 @@ export default function AdminComplaints() {
       {/* Complaints list */}
       {filtered.length > 0 && (
         <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-2)' }}>
-          {filtered.map((c, i) => (
+          {paginated.map((c, i) => (
             <motion.div key={c.id}
               style={{ background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:14, padding:'var(--sp-4)', cursor:'pointer', transition:'box-shadow 0.15s' }}
               initial={{ opacity:0, y:6 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.04 }}
@@ -155,6 +160,7 @@ export default function AdminComplaints() {
       {filtered.length === 0 && complaints.length > 0 && (
         <div style={{ textAlign:'center', padding:'var(--sp-8)', color:'var(--ink-400)' }}>No complaints match your filters.</div>
       )}
+      <Pagination page={page} totalPages={totalPages} onPageChange={p => setPage(p)} />
 
       {/* Detail modal */}
       <AnimatePresence>

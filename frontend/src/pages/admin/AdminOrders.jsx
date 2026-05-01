@@ -5,6 +5,7 @@ import { Search, X, ChevronDown, ChevronUp, Package } from 'lucide-react';
 import Badge from '../../components/ui/Badge';
 import { useAdminOrders } from '../../hooks/useAdminOrders';
 import { SkeletonTable } from '../../components/ui/Skeleton';
+import Pagination from '../../components/ui/Pagination';
 import styles from './AdminOrders.module.css';
 
 const statusConfig = {
@@ -29,6 +30,8 @@ export default function AdminOrders() {
   const [search,    setSearch]    = useState('');
   const [status,    setStatus]    = useState('all');
   const [expanded,  setExpanded]  = useState(null);
+  const [page,      setPage]      = useState(1);
+  const PAGE_SIZE = 20;
   const { orders, loading }       = useAdminOrders();
 
   const filtered = orders.filter(o => {
@@ -40,6 +43,8 @@ export default function AdminOrders() {
     const matchStatus = status === 'all' || o.status === status;
     return matchSearch && matchStatus;
   });
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const counts = {
     total:     orders.length,
@@ -100,7 +105,7 @@ export default function AdminOrders() {
         <div className={styles.empty}>No orders match your filters.</div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-2)' }}>
-          {filtered.map((o, i) => {
+          {paginated.map((o, i) => {
             const sc    = statusConfig[o.status] || { label: o.status, variant:'default' };
             const isExp = expanded === o.id;
             return (
@@ -210,6 +215,7 @@ export default function AdminOrders() {
           })}
         </div>
       )}
+      <Pagination page={page} totalPages={totalPages} onPageChange={p => setPage(p)} />
     </div>
   );
 }

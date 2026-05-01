@@ -1,7 +1,7 @@
 import usePageTitle from '../../utils/usePageTitle';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, MapPin, Phone, Mail, Plus, Edit2, X, Check, Trash2, MessageSquare, Send, AlertCircle } from 'lucide-react';
+import { User, MapPin, Phone, Mail, Plus, Edit2, X, Check, Trash2, MessageSquare, Send, AlertCircle, Clock, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import useToastStore from '../../store/toastStore';
 import { useAddresses } from '../../hooks/useAddresses';
@@ -36,65 +36,38 @@ export default function ConsumerProfile() {
 
   const [addrForm, setAddrForm] = useState({ label:'', address_line:'', city:'', pincode:'' });
 
-  // Complaint state
-  const [showComplaintForm, setShowComplaintForm] = useState(false);
-  const [complaintCategory, setComplaintCategory] = useState(''); // 'order' | 'pharmacy'
-  const [complaintType,     setComplaintType]     = useState('');
-  const [otherReason,       setOtherReason]       = useState('');
-  const [complaintSubject,  setComplaintSubject]  = useState('');
-  const [complaintBody,     setComplaintBody]     = useState('');
-  const [selectedOrderId,   setSelectedOrderId]   = useState('');
-  const [selectedStoreId,   setSelectedStoreId]   = useState('');
-  const [filingComplaint,   setFilingComplaint]   = useState(false);
+  // My Complaints state
+  const [myComplaints,     setMyComplaints]     = useState([]);
+  const [complaintsLoading,setComplaintsLoading]= useState(false);
+  const [showComplaintForm,setShowComplaintForm] = useState(false);
+  const [complaintType,    setComplaintType]    = useState('');
+  const [otherReason,      setOtherReason]      = useState('');
+  const [complaintSubject, setComplaintSubject] = useState('');
+  const [complaintBody,    setComplaintBody]    = useState('');
+  const [selectedStoreId,  setSelectedStoreId]  = useState('');
+  const [filingComplaint,  setFilingComplaint]  = useState(false);
+  const [expandedComplaint,setExpandedComplaint]= useState(null);
 
-  // Order-related complaint types (go to the pharmacy)
-  const orderComplaintTypes = [
-    { value: 'wrong_medicine',   label: 'Wrong Medicine Delivered',  validFor: ['delivered'] },
-    { value: 'expired_medicine', label: 'Expired Medicine Received', validFor: ['delivered'] },
-    { value: 'overcharged',      label: 'Overcharged / Above MRP',   validFor: ['delivered', 'accepted', 'packing', 'dispatched'] },
-    { value: 'late_delivery',    label: 'Late Delivery',             validFor: ['delivered', 'dispatched'] },
-    { value: 'other',            label: 'Other',                     validFor: null },
-  ];
+  const fetchMyComplaints = useCallback(() => {
+    setComplaintsLoading(true);
+    api.get('/consumer/complaints')
+      .then(res => setMyComplaints(res.data || []))
+      .catch(() => {})
+      .finally(() => setComplaintsLoading(false));
+  }, []);
 
-  // Pharmacy-related complaint types (go to admin)
+  useEffect(() => { fetchMyComplaints(); }, [fetchMyComplaints]);
+
   const pharmacyComplaintTypes = [
-    { value: 'rude_behaviour',    label: 'Rude or Unprofessional Behaviour' },
-    { value: 'frequent_cancels',  label: 'Frequent Order Cancellations'     },
-    { value: 'high_pricing',      label: 'Prices Above MRP / Overcharging'  },
-    { value: 'wrong_info',        label: 'Wrong Store Information Listed'   },
-    { value: 'unlicensed',        label: 'Suspected Unlicensed Operation'   },
-    { value: 'other',             label: 'Other'                            },
+    { value: 'rude_behaviour',   label: 'Rude or Unprofessional Behaviour' },
+    { value: 'frequent_cancels', label: 'Frequent Order Cancellations'     },
+    { value: 'high_pricing',     label: 'Prices Above MRP / Overcharging'  },
+    { value: 'wrong_info',       label: 'Wrong Store Information Listed'   },
+    { value: 'unlicensed',       label: 'Suspected Unlicensed Operation'   },
+    { value: 'other',            label: 'Other'                            },
   ];
 
-  const selectedOrder  = orders.find(o => o.id === selectedOrderId);
-  const selectedStatus = selectedOrder?.status || null;
-
-  const availableOrderTypes = orderComplaintTypes.filter(t => {
-    if (!selectedOrderId || !t.validFor) return true;
-    return t.validFor.includes(selectedStatus);
-  });
-
-  const complaintableOrders = orders.filter(o =>
-    ['delivered', 'accepted', 'packing', 'dispatched', 'rejected'].includes(o.status)
-  );
-
-  const handleOrderChange = (orderId) => {
-    setSelectedOrderId(orderId);
-    if (complaintType) {
-      const newStatus  = orders.find(o => o.id === orderId)?.status || null;
-      const typeConfig = orderComplaintTypes.find(t => t.value === complaintType);
-      if (typeConfig?.validFor && newStatus && !typeConfig.validFor.includes(newStatus)) {
-        setComplaintType('');
-        setComplaintSubject('');
-        setOtherReason('');
-      }
-    }
-  };
-
-  const typeLabel = (v) => {
-    const t = [...orderComplaintTypes, ...pharmacyComplaintTypes].find(x => x.value === v);
-    return t?.label || v;
-  };
+  const typeLabel = (v) => pharmacyComplaintTypes.find(x => x.value === v)?.label || v;
 
   const handleTypeChange = (t) => {
     setComplaintType(t);
@@ -102,37 +75,25 @@ export default function ConsumerProfile() {
     else { setComplaintSubject(''); setOtherReason(''); }
   };
 
-  const handleCategoryChange = (cat) => {
-    setComplaintCategory(cat);
-    setComplaintType('');
-    setComplaintSubject('');
-    setOtherReason('');
-    setSelectedOrderId('');
-    setSelectedStoreId('');
-  };
-
   const handleFileComplaint = async () => {
-    if (!complaintCategory)                                         { toast.error('Please select a complaint category.'); return; }
-    if (!complaintType)                                             { toast.error('Please select a complaint type.'); return; }
-    if (complaintType === 'other' && !otherReason.trim())           { toast.error('Please describe the reason for "Other".'); return; }
-    if (complaintType !== 'other' && !complaintSubject.trim())      { toast.error('Subject is required.'); return; }
-    if (!complaintBody.trim())                                      { toast.error('Please describe the issue in detail.'); return; }
-    if (complaintCategory === 'pharmacy' && !selectedStoreId)       { toast.error('Please select the pharmacy you are complaining about.'); return; }
+    if (!complaintType)                                    { toast.error('Please select an issue type.'); return; }
+    if (complaintType === 'other' && !otherReason.trim()) { toast.error('Please describe the issue.'); return; }
+    if (!complaintBody.trim())                             { toast.error('Please describe the issue in detail.'); return; }
+    if (!selectedStoreId)                                  { toast.error('Please select the pharmacy.'); return; }
 
     setFilingComplaint(true);
     try {
       await api.post('/consumer/complaints', {
-        type:      complaintType,
-        subject:   complaintType === 'other' ? otherReason.trim() : complaintSubject,
-        body:      complaintBody,
-        order_id:  complaintCategory === 'order' ? (selectedOrderId || null) : null,
-        store_id:  complaintCategory === 'pharmacy' ? selectedStoreId : null,
-        category:  complaintCategory,
+        type:     complaintType,
+        subject:  complaintType === 'other' ? otherReason.trim() : complaintSubject,
+        body:     complaintBody,
+        store_id: selectedStoreId,
+        category: 'pharmacy',
       });
       toast.success('Complaint filed. Our team will review it within 24 hours.');
       setShowComplaintForm(false);
-      setComplaintCategory(''); setComplaintType(''); setOtherReason('');
-      setComplaintSubject(''); setComplaintBody(''); setSelectedOrderId(''); setSelectedStoreId('');
+      setComplaintType(''); setOtherReason(''); setComplaintSubject(''); setComplaintBody(''); setSelectedStoreId('');
+      fetchMyComplaints();
     } catch (err) {
       toast.error(err.message || 'Failed to file complaint.');
     } finally {
@@ -288,149 +249,127 @@ export default function ConsumerProfile() {
         )}
       </AnimatePresence>
 
-      {/* Complaints */}
+      {/* My Complaints */}
       <motion.div style={{ ...card, padding:'var(--sp-5)', marginTop:'var(--sp-4)' }}
         initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.16, type:'spring', stiffness:280, damping:24 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'var(--sp-4)' }}>
           <h2 style={{ fontSize:16, fontWeight:700, color:'var(--ink-900)', display:'flex', alignItems:'center', gap:8 }}>
-            <MessageSquare size={16} strokeWidth={1.8} style={{ color:'var(--green-700)' }} /> File a Complaint
+            <MessageSquare size={16} strokeWidth={1.8} style={{ color:'var(--green-700)' }} /> My Complaints
           </h2>
           <button onClick={() => setShowComplaintForm(true)}
-            style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background:'var(--green-700)', color:'#FFFFFF', border:'none', borderRadius:'var(--r-md)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>
-            <Plus size={14} strokeWidth={2.5} /> New Complaint
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background:'var(--warning-light)', color:'var(--warning-dark)', border:'1px solid #FDE68A', borderRadius:'var(--r-md)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>
+            <Plus size={14} strokeWidth={2.5} /> Pharmacy Complaint
           </button>
         </div>
-        <div style={{ fontSize:13, color:'var(--ink-500)', lineHeight:1.6 }}>
-          Report issues with your orders — wrong medicines, late delivery, overcharging, or store behaviour. Our team reviews every complaint within 24 hours.
-        </div>
+
+        {complaintsLoading && <div style={{ fontSize:13, color:'var(--ink-400)', padding:'var(--sp-4)' }}>Loading complaints…</div>}
+
+        {!complaintsLoading && myComplaints.length === 0 && (
+          <div style={{ textAlign:'center', padding:'var(--sp-6)', color:'var(--ink-400)', fontSize:13 }}>
+            No complaints filed yet. To report an order issue, open the order and click "Report an Issue".
+          </div>
+        )}
+
+        {!complaintsLoading && myComplaints.length > 0 && (
+          <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-3)' }}>
+            {myComplaints.map(c => {
+              const statusStyle = {
+                open:      { color:'var(--blue-700)',     bg:'var(--blue-50)',       icon:<Clock size={12}/> },
+                in_review: { color:'var(--warning-dark)', bg:'var(--warning-light)', icon:<Clock size={12}/> },
+                resolved:  { color:'var(--success-dark)', bg:'var(--success-light)', icon:<CheckCircle size={12}/> },
+                closed:    { color:'var(--ink-500)',       bg:'var(--ink-100)',       icon:<CheckCircle size={12}/> },
+              }[c.status] || { color:'var(--ink-500)', bg:'var(--ink-100)', icon:<Clock size={12}/> };
+              const isExp = expandedComplaint === c.id;
+              return (
+                <div key={c.id} style={{ border:'1.5px solid var(--ink-200)', borderRadius:12, overflow:'hidden' }}>
+                  <div onClick={() => setExpandedComplaint(isExp ? null : c.id)}
+                    style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'var(--sp-3) var(--sp-4)', cursor:'pointer', background: isExp ? 'var(--ink-50)' : 'var(--white)' }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:'var(--ink-900)' }}>{c.subject}</div>
+                      <div style={{ fontSize:11, color:'var(--ink-400)', marginTop:2 }}>
+                        {c.category === 'order' ? '📦 Order complaint' : '🏪 Pharmacy complaint'} · {new Date(c.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:'var(--sp-2)' }}>
+                      <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, fontWeight:600, color:statusStyle.color, background:statusStyle.bg, padding:'2px 8px', borderRadius:9999 }}>
+                        {statusStyle.icon} {c.status?.replace('_',' ')}
+                      </span>
+                      {isExp ? <ChevronUp size={14} style={{ color:'var(--ink-400)' }}/> : <ChevronDown size={14} style={{ color:'var(--ink-400)' }}/>}
+                    </div>
+                  </div>
+                  {isExp && (
+                    <div style={{ padding:'var(--sp-3) var(--sp-4)', borderTop:'1px solid var(--ink-100)', background:'var(--ink-50)' }}>
+                      <div style={{ fontSize:13, color:'var(--ink-700)', lineHeight:1.6, marginBottom: c.resolution ? 'var(--sp-3)' : 0 }}>{c.body}</div>
+                      {c.resolution && (
+                        <div style={{ background:'var(--success-light)', borderRadius:8, padding:'var(--sp-3)', fontSize:13, color:'var(--success-dark)' }}>
+                          <strong>Resolution:</strong> {c.resolution}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </motion.div>
 
-      {/* Complaint Form Modal */}
+      {/* Pharmacy Complaint Modal */}
       <AnimatePresence>
         {showComplaintForm && (
           <motion.div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:'var(--sp-5)' }}
             initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={() => setShowComplaintForm(false)}>
-            <motion.div style={{ background:'#FFFFFF', borderRadius:20, width:'100%', maxWidth:480, boxShadow:'var(--shadow-lg)', overflow:'hidden', maxHeight:'90vh', overflowY:'auto' }}
+            <motion.div style={{ background:'#FFFFFF', borderRadius:20, width:'100%', maxWidth:460, boxShadow:'var(--shadow-lg)', overflow:'hidden', maxHeight:'90vh', overflowY:'auto' }}
               initial={{ scale:0.93, y:20, opacity:0 }} animate={{ scale:1, y:0, opacity:1 }}
               exit={{ scale:0.93, opacity:0 }} transition={{ type:'spring', stiffness:320, damping:26 }}
               onClick={e => e.stopPropagation()}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'var(--sp-4) var(--sp-5)', borderBottom:'1px solid #E5E7EB' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:'var(--sp-3)' }}>
                   <AlertCircle size={20} strokeWidth={1.8} style={{ color:'var(--warning-dark)' }} />
-                  <h3 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:600, color:'var(--ink-900)' }}>File a Complaint</h3>
+                  <h3 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:600, color:'var(--ink-900)' }}>Pharmacy Complaint</h3>
                 </div>
                 <button onClick={() => setShowComplaintForm(false)} style={{ display:'flex', padding:4, color:'var(--ink-400)', borderRadius:6, background:'none', border:'none', cursor:'pointer' }}><X size={18} /></button>
               </div>
               <div style={{ padding:'var(--sp-5)', display:'flex', flexDirection:'column', gap:'var(--sp-4)' }}>
-
-                {/* Step 1 — Complaint category */}
-                <div>
-                  <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:8 }}>What is this complaint about? *</label>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--sp-2)' }}>
-                    {[
-                      { val:'order',    emoji:'📦', title:'An Order',   sub:'Wrong item, late delivery, overcharged' },
-                      { val:'pharmacy', emoji:'🏪', title:'A Pharmacy', sub:'Rude behaviour, frequent cancellations, wrong info' },
-                    ].map(({ val, emoji, title, sub }) => (
-                      <button key={val} onClick={() => handleCategoryChange(val)} type="button"
-                        style={{ textAlign:'left', padding:'var(--sp-3)', border: complaintCategory === val ? '2px solid var(--green-700)' : '1.5px solid #E5E7EB', borderRadius:10, background: complaintCategory === val ? 'var(--green-50)' : 'var(--white)', cursor:'pointer', fontFamily:'var(--font-body)' }}>
-                        <div style={{ fontSize:20, marginBottom:4 }}>{emoji}</div>
-                        <div style={{ fontSize:13, fontWeight:700, color:'var(--ink-900)' }}>{title}</div>
-                        <div style={{ fontSize:11, color:'var(--ink-400)', marginTop:2 }}>{sub}</div>
-                      </button>
-                    ))}
-                  </div>
+                <div style={{ background:'var(--blue-50)', border:'1px solid #BFDBFE', borderRadius:8, padding:'8px 12px', fontSize:12, color:'var(--blue-700)' }}>
+                  Pharmacy complaints are reviewed by the MedMarket admin team within 48 hours.
                 </div>
-
-                {/* ORDER complaint fields */}
-                {complaintCategory === 'order' && (<>
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>
-                      Related Order <span style={{ fontWeight:400, color:'var(--ink-400)' }}>(select to filter complaint types)</span>
-                    </label>
-                    <select value={selectedOrderId} onChange={e => handleOrderChange(e.target.value)}
-                      style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color: selectedOrderId ? 'var(--ink-900)' : 'var(--ink-400)', background:'var(--white)' }}>
-                      <option value="">Select an order (optional)</option>
-                      {complaintableOrders.map(o => (
-                        <option key={o.id} value={o.id}>
-                          #{o.id.slice(0,8).toUpperCase()} · {o.store?.name || 'Store'} · ₹{Number(o.total_amount).toFixed(0)} · {o.status}
-                        </option>
-                      ))}
-                    </select>
-                    {selectedStatus && (
-                      <div style={{ fontSize:11, color:'var(--ink-400)', marginTop:4 }}>
-                        Showing types for a <strong>{selectedStatus}</strong> order.
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Complaint Type *</label>
-                    <select value={complaintType} onChange={e => handleTypeChange(e.target.value)}
-                      style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', background:'var(--white)' }}>
-                      <option value="">Select type…</option>
-                      {availableOrderTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
-                  </div>
-                </>)}
-
-                {/* PHARMACY complaint fields */}
-                {complaintCategory === 'pharmacy' && (<>
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Which pharmacy? *</label>
-                    <select value={selectedStoreId} onChange={e => setSelectedStoreId(e.target.value)}
-                      style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color: selectedStoreId ? 'var(--ink-900)' : 'var(--ink-400)', background:'var(--white)' }}>
-                      <option value="">Select pharmacy…</option>
-                      {(orderedStores.length > 0 ? orderedStores : allStores.map(s => ({ id:s.id, name:s.name }))).map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                    {orderedStores.length === 0 && allStores.length > 0 && (
-                      <div style={{ fontSize:11, color:'var(--ink-400)', marginTop:4 }}>Showing all verified pharmacies.</div>
-                    )}
-                  </div>
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Issue Type *</label>
-                    <select value={complaintType} onChange={e => handleTypeChange(e.target.value)}
-                      style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', background:'var(--white)' }}>
-                      <option value="">Select issue…</option>
-                      {pharmacyComplaintTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ background:'var(--blue-50)', border:'1px solid #BFDBFE', borderRadius:8, padding:'8px 12px', fontSize:12, color:'var(--blue-700)' }}>
-                    Pharmacy complaints are reviewed by the MedMarket admin team.
-                  </div>
-                </>)}
-
-                {/* Other reason */}
+                <div>
+                  <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Which pharmacy? *</label>
+                  <select value={selectedStoreId} onChange={e => setSelectedStoreId(e.target.value)}
+                    style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color: selectedStoreId ? 'var(--ink-900)' : 'var(--ink-400)', background:'var(--white)' }}>
+                    <option value=''>Select pharmacy…</option>
+                    {(orderedStores.length > 0 ? orderedStores : allStores.map(s => ({ id:s.id, name:s.name }))).map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Issue Type *</label>
+                  <select value={complaintType} onChange={e => handleTypeChange(e.target.value)}
+                    style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', background:'var(--white)' }}>
+                    <option value=''>Select issue…</option>
+                    {pharmacyComplaintTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
                 {complaintType === 'other' && (
                   <div>
                     <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Please specify *</label>
-                    <input value={otherReason} onChange={e => setOtherReason(e.target.value)} placeholder="Briefly describe your issue…"
+                    <input value={otherReason} onChange={e => setOtherReason(e.target.value)} placeholder="Briefly describe…"
                       style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', boxSizing:'border-box' }} />
                   </div>
                 )}
-
-                {/* Auto-filled subject */}
-                {complaintType && complaintType !== 'other' && complaintCategory && (
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Subject *</label>
-                    <input value={complaintSubject} onChange={e => setComplaintSubject(e.target.value)} placeholder="Brief description"
-                      style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', boxSizing:'border-box' }} />
-                  </div>
-                )}
-
-                {complaintCategory && (
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Details *</label>
-                    <textarea value={complaintBody} onChange={e => setComplaintBody(e.target.value)}
-                      placeholder="Describe the issue in detail…" rows={4}
-                      style={{ width:'100%', padding:'10px 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', resize:'vertical', outline:'none', boxSizing:'border-box', color:'var(--ink-900)' }} />
-                  </div>
-                )}
+                <div>
+                  <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>Details *</label>
+                  <textarea value={complaintBody} onChange={e => setComplaintBody(e.target.value)}
+                    placeholder="Describe the issue in detail…" rows={4}
+                    style={{ width:'100%', padding:'10px 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', resize:'vertical', outline:'none', boxSizing:'border-box', color:'var(--ink-900)' }} />
+                </div>
               </div>
               <div style={{ display:'flex', gap:'var(--sp-3)', padding:'var(--sp-4) var(--sp-5)', borderTop:'1px solid #E5E7EB' }}>
                 <button onClick={() => setShowComplaintForm(false)} style={{ flex:1, padding:10, background:'#FFFFFF', color:'var(--ink-700)', border:'1px solid #E5E7EB', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>Cancel</button>
-                <button onClick={handleFileComplaint} disabled={filingComplaint || !complaintCategory}
-                  style={{ flex:1, padding:10, background:'var(--green-700)', color:'#FFFFFF', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor: (filingComplaint || !complaintCategory) ? 'not-allowed' : 'pointer', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', justifyContent:'center', gap:6, opacity: (filingComplaint || !complaintCategory) ? 0.7 : 1 }}>
+                <button onClick={handleFileComplaint} disabled={filingComplaint || !complaintType}
+                  style={{ flex:1, padding:10, background:'var(--green-700)', color:'#FFFFFF', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor: (filingComplaint || !complaintType) ? 'not-allowed' : 'pointer', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', justifyContent:'center', gap:6, opacity: (filingComplaint || !complaintType) ? 0.7 : 1 }}>
                   <Send size={14} strokeWidth={2.5} /> {filingComplaint ? 'Filing…' : 'Submit Complaint'}
                 </button>
               </div>

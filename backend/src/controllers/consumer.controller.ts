@@ -80,6 +80,19 @@ export async function fileComplaint(req: Request, res: Response) {
   }
 }
 
+export async function getMyComplaints(req: Request, res: Response) {
+  try {
+    const complaints = await prisma.complaint.findMany({
+      where: { consumer_id: req.userId },
+      orderBy: { created_at: 'desc' },
+    });
+    return successResponse(res, complaints, 'Complaints fetched');
+  } catch (err) {
+    console.error('getMyComplaints error:', err);
+    return errorResponse(res, 'Something went wrong', 500);
+  }
+}
+
 export async function updateProfile(req: Request, res: Response) {
   try {
     const { name, mobile } = req.body;

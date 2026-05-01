@@ -3,10 +3,9 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard, Package, AlertTriangle, ShoppingBag,
-  BarChart2, Tag, Store, Bell, LogOut, ChevronRight, Menu, X, MessageSquare
+  BarChart2, Tag, Store, LogOut, ChevronRight, Menu, X, MessageSquare, Inbox
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
-import { useNotifications } from '../hooks/useNotifications';
 import styles from './PharmacyLayout.module.css';
 
 const navItems = [
@@ -16,7 +15,7 @@ const navItems = [
   { to: '/pharmacy/orders',          icon: ShoppingBag,     label: 'Orders',         end: false },
   { to: '/pharmacy/analytics',       icon: BarChart2,       label: 'Analytics',      end: false },
   { to: '/pharmacy/pricing',         icon: Tag,             label: 'Pricing',        end: false },
-  { to: '/pharmacy/notifications',   icon: Bell,            label: 'Notifications',  end: false },
+  { to: '/pharmacy/notifications',   icon: Inbox,           label: 'Notifications',  end: false },
   { to: '/pharmacy/complaints',      icon: MessageSquare,   label: 'Complaints',     end: false },
   { to: '/pharmacy/profile',         icon: Store,           label: 'Store Profile',  end: false },
 ];
@@ -25,7 +24,6 @@ export default function PharmacyLayout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { unreadCount } = useNotifications();
 
   const handleLogout = () => {
     logout();
@@ -83,12 +81,6 @@ export default function PharmacyLayout() {
             <Menu size={20} strokeWidth={1.8} />
           </button>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--sp-3)' }}>
-            <div style={{ position: 'relative' }}>
-              <Bell size={20} strokeWidth={1.8} className={styles.bell}
-                onClick={() => navigate('/pharmacy/notifications')}
-                style={{ cursor: 'pointer' }} />
-              {unreadCount > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: 'var(--danger)', color: 'var(--always-white)', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-body)' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
-            </div>
           </div>
         </div>
 

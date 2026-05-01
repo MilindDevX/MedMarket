@@ -6,6 +6,7 @@ import Badge from '../../components/ui/Badge';
 import useToastStore from '../../store/toastStore';
 import { useAdminUsers } from '../../hooks/useAdminUsers';
 import { SkeletonTable } from '../../components/ui/Skeleton';
+import Pagination from '../../components/ui/Pagination';
 
 export default function AdminUsers() {
   usePageTitle('User Management');
@@ -13,6 +14,8 @@ export default function AdminUsers() {
   const { users, loading, error, toggleActive } = useAdminUsers();
   const [search,       setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [page,         setPage]         = useState(1);
+  const PAGE_SIZE = 20;
   const toast = useToastStore();
 
   const filtered = users.filter(u => {
@@ -25,6 +28,8 @@ export default function AdminUsers() {
       (statusFilter === 'active' ? u.is_active : !u.is_active);
     return matchSearch && matchStatus;
   });
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const handleToggle = async (u) => {
     try {
@@ -112,7 +117,7 @@ export default function AdminUsers() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((user, i) => (
+              {paginated.map((user, i) => (
                 <motion.tr key={user.id}
                   style={{ borderBottom:'1px solid var(--ink-100)', opacity: user.is_active !== false ? 1 : 0.6 }}
                   initial={{ opacity:0 }} animate={{ opacity: user.is_active !== false ? 1 : 0.6 }}
@@ -155,6 +160,7 @@ export default function AdminUsers() {
           </table>
         </div>
       )}
+      <Pagination page={page} totalPages={totalPages} onPageChange={p => setPage(p)} />
     </div>
   );
 }

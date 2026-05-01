@@ -8,6 +8,7 @@ import { useMedicines } from '../../hooks/useMedicines';
 import Badge from '../../components/ui/Badge';
 import useToastStore from '../../store/toastStore';
 import { SkeletonTable } from '../../components/ui/Skeleton';
+import Pagination from '../../components/ui/Pagination';
 import styles from './PharmacyInventory.module.css';
 
 const getStatus = (item) => {
@@ -46,6 +47,8 @@ export default function PharmacyInventory() {
   const [editItem, setEditItem]     = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm]             = useState(emptyForm);
+  const [page, setPage]             = useState(1);
+  const PAGE_SIZE = 15;
   const toast = useToastStore();
 
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -67,6 +70,8 @@ export default function PharmacyInventory() {
       (filter === 'alerts' && ['expiring-soon','expiring-critical','expired','low'].includes(item.status));
     return matchSearch && matchFilter;
   });
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const alertCount = enriched.filter(i => ['expiring-soon','expiring-critical','expired','low'].includes(i.status)).length;
 
@@ -166,7 +171,7 @@ export default function PharmacyInventory() {
             ))}</tr>
           </thead>
           <tbody>
-            {filtered.map((item, i) => {
+            {paginated.map((item, i) => {
               const { badge, label } = statusMap[item.status] || statusMap.ok;
               const expClass = ['expiring-critical','expired'].includes(item.status)
                 ? styles.expCrit : item.status === 'expiring-soon' ? styles.expWarn : styles.expOk;
@@ -200,6 +205,7 @@ export default function PharmacyInventory() {
           <div className={styles.empty}><Package size={32} strokeWidth={1} /><p>No medicines match your search.</p></div>
         )}
       </div>
+      <Pagination page={page} totalPages={totalPages} onPageChange={p => setPage(p)} />
 
       {/* Add Modal */}
       <AnimatePresence>

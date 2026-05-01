@@ -62,6 +62,8 @@ export async function googleAuth(req: Request, res: Response) {
       where: { OR: [{ google_id }, { email }] },
     });
 
+    let isNew = false;
+
     if (user) {
       if (!user.is_active) {
         return errorResponse(res, 'Your account has been deactivated. Please contact support.', 403);
@@ -74,6 +76,7 @@ export async function googleAuth(req: Request, res: Response) {
       user = await prisma.user.create({
         data: { name, email, google_id, role: assignedRole, is_active: true },
       });
+      isNew = true;
     }
 
     const { accessToken, refreshToken } = await issueTokenPair(user.id, user.role);
@@ -81,6 +84,7 @@ export async function googleAuth(req: Request, res: Response) {
     return successResponse(res, {
       accessToken,
       refreshToken,
+      isNew,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     }, 'Authenticated with Google');
   } catch (err) {
