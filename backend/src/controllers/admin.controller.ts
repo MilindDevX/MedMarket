@@ -14,7 +14,7 @@ export async function listUsers(req: Request, res: Response) {
     return successResponse(res, users, 'Users fetched');
   } catch (err) {
     console.error('listUsers error:', err);
-    return errorResponse(res, 'Something went wrong', 500);
+    return errorResponse(res, 'Something went wrong', 500, ErrorCode.INTERNAL_ERROR);
   }
 }
 
@@ -27,7 +27,7 @@ export async function toggleUserActive(req: Request, res: Response) {
     return successResponse(res, updated, 'User status updated');
   } catch (err) {
     console.error('toggleUserActive error:', err);
-    return errorResponse(res, 'Something went wrong', 500);
+    return errorResponse(res, 'Something went wrong', 500, ErrorCode.INTERNAL_ERROR);
   }
 }
 
@@ -41,7 +41,7 @@ export async function listApplications(req: Request, res: Response) {
       orderBy: { created_at: "desc" },
     });
     return successResponse(res, stores, "Applications fetched successfully");
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
 export async function getApplication(req: Request, res: Response) {
@@ -62,7 +62,7 @@ export async function getApplication(req: Request, res: Response) {
     });
 
     return successResponse(res, { ...store, documents: docsWithUrls }, "Application fetched successfully");
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
 export async function approveApplication(req: Request, res: Response) {
@@ -79,7 +79,7 @@ export async function approveApplication(req: Request, res: Response) {
     await createNotification(store.owner_id, "store.approved", "Your pharmacy has been approved! 🎉",
       `Congratulations! ${store.name} has been verified and is now live on MedMarket.`);
     return successResponse(res, updated, "Application approved successfully");
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
 // Separate from approveApplication — allows suspended → approved without the pending check
@@ -97,7 +97,7 @@ export async function reactivateApplication(req: Request, res: Response) {
     await createNotification(store.owner_id, "store.approved", "Your pharmacy has been reactivated",
       `Great news! ${store.name} is back online and visible to consumers.`);
     return successResponse(res, updated, "Pharmacy reactivated successfully");
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
 export async function rejectApplicaton(req: Request, res: Response) {
@@ -114,7 +114,7 @@ export async function rejectApplicaton(req: Request, res: Response) {
     await createNotification(store.owner_id, "store.rejected", "Application not approved",
       `Your application for ${store.name} was not approved. Reason: ${rejection_reason}. You may resubmit with corrected documents.`);
     return successResponse(res, updated, "Application rejected");
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
 export async function suspendApplication(req: Request, res: Response) {
@@ -127,7 +127,7 @@ export async function suspendApplication(req: Request, res: Response) {
     await createNotification(store.owner_id, "store.suspended", "Your store has been suspended",
       `${store.name} has been suspended. Contact pharmacy-support@medmarket.in to resolve this.`);
     return successResponse(res, updated, 'Pharmacy suspended');
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
 export async function updatePharmacyDetails(req: Request, res: Response) {
@@ -159,7 +159,7 @@ export async function updatePharmacyDetails(req: Request, res: Response) {
       },
     });
     return successResponse(res, updated, 'Pharmacy details updated');
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
 export async function getAllOrders(req: Request, res: Response) {
@@ -175,7 +175,7 @@ export async function getAllOrders(req: Request, res: Response) {
     return successResponse(res, orders, 'Orders fetched');
   } catch (err) {
     console.error('getAllOrders error:', err);
-    return errorResponse(res, 'Something went wrong', 500);
+    return errorResponse(res, 'Something went wrong', 500, ErrorCode.INTERNAL_ERROR);
   }
 }
 
@@ -249,7 +249,7 @@ export async function getPharmacyAnalytics(req: Request, res: Response) {
     }, 'Pharmacy analytics fetched');
   } catch (err) {
     console.error('getPharmacyAnalytics error:', err);
-    return errorResponse(res, 'Something went wrong', 500);
+    return errorResponse(res, 'Something went wrong', 500, ErrorCode.INTERNAL_ERROR);
   }
 }
 
@@ -262,7 +262,7 @@ export async function listComplaints(req: Request, res: Response) {
     return successResponse(res, complaints, 'Complaints fetched');
   } catch (err) {
     console.error('listComplaints error:', err);
-    return errorResponse(res, 'Something went wrong', 500);
+    return errorResponse(res, 'Something went wrong', 500, ErrorCode.INTERNAL_ERROR);
   }
 }
 export async function updateComplaint(req: Request, res: Response) {
@@ -278,6 +278,6 @@ export async function updateComplaint(req: Request, res: Response) {
     return successResponse(res, updated, 'Complaint updated');
   } catch (err) {
     console.error('updateComplaint error:', err);
-    return errorResponse(res, 'Something went wrong', 500);
+    return errorResponse(res, 'Something went wrong', 500, ErrorCode.INTERNAL_ERROR);
   }
 }

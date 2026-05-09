@@ -42,4 +42,9 @@ router.get("/analytics/pharmacy/:id",     authenticate, requireAdmin, getPharmac
 router.get("/complaints",                 authenticate, requireAdmin, listComplaints);
 router.patch("/complaints/:id",           authenticate, requireAdmin, updateComplaint);
 
+// ── Job Queue (demo + ops) ──
+import { triggerExpiryJob, getExpiryJobStatus } from '../controllers/queue.controller.ts';
+router.post("/jobs/expiry/trigger",       authenticate, requireAdmin, triggerExpiryJob);
+router.get("/jobs/expiry/status",         authenticate, requireAdmin, getExpiryJobStatus);
+
 export default router;
