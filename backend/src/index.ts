@@ -7,6 +7,9 @@ import morgan from 'morgan';
 import prisma from './config/prisma.ts';
 import { generalLimiter, authLimiter } from './middleware/rateLimit.middleware.ts';
 import { globalErrorHandler } from './middleware/errorHandler.middleware.ts';
+import { mountSwagger } from './config/swagger.ts';
+import { initExpiryQueue, shutdownExpiryQueue } from './queues/expiry.queue.ts';
+import { scheduleNightlyExpiryJob } from './queues/expiry.scheduler.ts';
 
 import authRouter         from './routes/auth.routes.ts';
 import pharmacyRouter     from './routes/pharmacy.routes.ts';
@@ -34,6 +37,9 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(generalLimiter);
 
+// ── API Docs — available at /api/docs ──
+mountSwagger(app);
+
 app.get('/health', (_req, res) => {
   res.json({ status:'ok', timestamp:new Date().toISOString(), service:'MedMarket API', version:'1.0.0' });
 });
@@ -56,7 +62,23 @@ app.use(globalErrorHandler);
 async function main() {
   await prisma.$connect();
   console.log('✅ Database connected');
+
+  // ── BullMQ — expiry notification queue ──
+  await initExpiryQueue();
+  await scheduleNightlyExpiryJob();
+
   app.listen(PORT, () => console.log(`🚀 MedMarket API running on port ${PORT}`));
 }
+
+// ── Graceful shutdown ──────────────────────────────────────────────────────
+async function shutdown(signal: string) {
+  console.log(`\n${signal} received — shutting down gracefully`);
+  await shutdownExpiryQueue();
+  await prisma.$disconnect();
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
 
 main();
