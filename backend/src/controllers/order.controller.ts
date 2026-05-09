@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../config/prisma.ts";
 import { errorResponse, successResponse } from "../utils/response.ts";
+import { ErrorCode } from "../types/errors.ts";
 import { Decimal } from "@prisma/client/runtime/client";
 import { createNotification } from "./notification.controller.ts";
 
@@ -8,10 +9,10 @@ export async function placeOrder(req: Request, res: Response) {
   try {
     const { store_id, delivery_type, delivery_address, payment_method, items } = req.body;
     if (!store_id || !delivery_type || !payment_method || !items || !items.length)
-      return errorResponse(res, "All fields are required", 400);
+      return errorResponse(res, "All fields are required", 400, ErrorCode.MISSING_FIELDS);
 
     const store = await prisma.pharmacyStore.findFirst({ where: { id: store_id, status: "approved" } });
-    if (!store) return errorResponse(res, "Store not found or not approved", 404);
+    if (!store) return errorResponse(res, "Store not found or not approved", 404, ErrorCode.STORE_NOT_FOUND);
 
     const order = await prisma.$transaction(async (tx) => {
       let subtotal = 0;
@@ -42,7 +43,7 @@ export async function placeOrder(req: Request, res: Response) {
   } catch (error: any) {
     const known = ["Inventory item","Insufficient stock","COD not available","not found"];
     if (known.some(e => error?.message?.includes(e))) return errorResponse(res, error.message, 400);
-    return errorResponse(res, "Something went wrong", 500);
+    return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR);
   }
 }
 
@@ -50,24 +51,24 @@ export async function getMyOrders(req: Request, res: Response) {
   try {
     const orders = await prisma.order.findMany({ where: { consumer_id: req.userId }, include: { items: true, store: { select: { name:true, phone:true, city:true } } }, orderBy: { created_at: "desc" } });
     return successResponse(res, orders, "Orders fetched successfully");
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
 export async function getOrder(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
     const order = await prisma.order.findFirst({ where: { id, consumer_id: req.userId }, include: { items: true, store: { select: { name:true, phone:true, city:true, address_line:true } } } });
-    if (!order) return errorResponse(res, "Order not found", 404);
+    if (!order) return errorResponse(res, "Order not found", 404, ErrorCode.ORDER_NOT_FOUND);
     return successResponse(res, order, "Order fetched successfully");
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
 export async function cancelOrder(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
     const order = await prisma.order.findFirst({ where: { id, consumer_id: req.userId }, include: { items: true, store: { select: { owner_id:true, name:true } } } });
-    if (!order) return errorResponse(res, "Order not found", 404);
-    if (order.status !== "confirmed") return errorResponse(res, `Cannot cancel an order that is already '${order.status}'. Only confirmed orders can be cancelled.`, 400);
+    if (!order) return errorResponse(res, "Order not found", 404, ErrorCode.ORDER_NOT_FOUND);
+    if (order.status !== "confirmed") return errorResponse(res, `Cannot cancel an order that is already '${order.status}'. Only confirmed orders can be cancelled.`, 400, ErrorCode.CANCEL_NOT_ALLOWED);
 
     await prisma.$transaction(async (tx) => {
       await tx.order.update({ where: { id }, data: { status: "cancelled", cancelled_at: new Date() } });
@@ -76,18 +77,18 @@ export async function cancelOrder(req: Request, res: Response) {
 
     await createNotification(order.store.owner_id, "order.cancelled", "Order cancelled by consumer", `Order #${id.slice(0,8).toUpperCase()} has been cancelled by the customer.`);
     return successResponse(res, null, "Order cancelled successfully");
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
 export async function getPharmacyOrders(req: Request, res: Response) {
   try {
     const store = await prisma.pharmacyStore.findFirst({ where: { owner_id: req.userId, status: "approved" } });
-    if (!store) return errorResponse(res, "Approved store not found", 404);
+    if (!store) return errorResponse(res, "Approved store not found", 404, ErrorCode.STORE_NOT_FOUND);
     const { status } = req.query;
     const statusParam = typeof status === "string" ? status : undefined;
     const orders = await prisma.order.findMany({ where: { store_id: store.id, ...(statusParam && { status: statusParam as any }) }, include: { items: true, consumer: { select: { name:true, mobile:true } } }, orderBy: { created_at: "desc" } });
     return successResponse(res, orders, "Orders fetched successfully");
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
 export async function updateOrderStatus(req: Request, res: Response) {
@@ -96,18 +97,18 @@ export async function updateOrderStatus(req: Request, res: Response) {
     const { action, rejection_reason } = req.body;
 
     const store = await prisma.pharmacyStore.findFirst({ where: { owner_id: req.userId, status: "approved" } });
-    if (!store) return errorResponse(res, "Approved store not found", 404);
+    if (!store) return errorResponse(res, "Approved store not found", 404, ErrorCode.STORE_NOT_FOUND);
 
     const order = await prisma.order.findFirst({ where: { id, store_id: store.id }, include: { items: true } });
-    if (!order) return errorResponse(res, "Order not found", 404);
+    if (!order) return errorResponse(res, "Order not found", 404, ErrorCode.ORDER_NOT_FOUND);
 
     const allowedFrom: Record<string,string> = { accept:"confirmed", pack:"accepted", dispatch:"packing", deliver:"dispatched", reject:"confirmed" };
     const validTransitions: Record<string,string> = { accept:"accepted", pack:"packing", dispatch:"dispatched", deliver:"delivered", reject:"rejected" };
 
     const newStatus = validTransitions[action];
-    if (!newStatus) return errorResponse(res, "Invalid action", 400);
-    if (order.status !== allowedFrom[action]) return errorResponse(res, `Cannot '${action}' an order that is currently '${order.status}'. Expected status: '${allowedFrom[action]}'.`, 400);
-    if (action === "reject" && !rejection_reason) return errorResponse(res, "Rejection reason is required", 400);
+    if (!newStatus) return errorResponse(res, "Invalid action", 400, ErrorCode.INVALID_STATUS_TRANSITION);
+    if (order.status !== allowedFrom[action]) return errorResponse(res, `Cannot '${action}' an order that is currently '${order.status}'. Expected status: '${allowedFrom[action]}'.`, 400, ErrorCode.INVALID_STATUS_TRANSITION);
+    if (action === "reject" && !rejection_reason) return errorResponse(res, "Rejection reason is required", 400, ErrorCode.MISSING_FIELDS);
 
     const updateData: any = { status: newStatus, ...(action==="accept" && {accepted_at:new Date()}), ...(action==="dispatch" && {dispatched_at:new Date()}), ...(action==="deliver" && {delivered_at:new Date()}), ...(action==="reject" && {rejection_reason}) };
 
@@ -131,5 +132,5 @@ export async function updateOrderStatus(req: Request, res: Response) {
     if (msg) await createNotification(order.consumer_id, `order.${action}`, msg.title, msg.body);
 
     return successResponse(res, null, `Order ${newStatus} successfully`);
-  } catch { return errorResponse(res, "Something went wrong", 500); }
+  } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
