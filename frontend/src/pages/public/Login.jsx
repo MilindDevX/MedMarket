@@ -41,6 +41,7 @@ export default function Login() {
       const status = useAuthStore.getState().pharmacyStatus;
       if (status === 'pending' || status === 'rejected') navigate('/pharmacy/pending');
       else if (status === 'suspended') navigate('/pharmacy/suspended');
+      else if (!status) navigate('/pharmacy/register');
       else navigate('/pharmacy/dashboard');
     } else navigate('/admin/dashboard');
   };
