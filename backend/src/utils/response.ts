@@ -1,4 +1,5 @@
 import type { Response } from 'express';
+import type { ErrorCode } from '../types/errors.ts';
 
 export function successResponse(
   res: Response,
@@ -17,11 +18,13 @@ export function errorResponse(
   res: Response,
   message: string,
   statusCode = 400,
+  errorCode?: ErrorCode | string,
   errors?: unknown
 ) {
   return res.status(statusCode).json({
-    success: false,
+    success:    false,
     message,
+    error_code: errorCode ?? null,
     errors,
   });
 }
