@@ -4,6 +4,7 @@ import prisma from '../config/prisma.ts';
 import { hashPassword, comparePassword } from '../utils/hash.ts';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt.ts';
 import { successResponse, errorResponse } from '../utils/response.ts';
+import { ErrorCode } from '../types/errors.ts';
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -89,7 +90,7 @@ export async function googleAuth(req: Request, res: Response) {
     }, 'Authenticated with Google');
   } catch (err) {
     console.error('googleAuth error:', err);
-    return errorResponse(res, 'Something went wrong', 500);
+    return errorResponse(res, 'Something went wrong', 500, ErrorCode.INTERNAL_ERROR);
   }
 }
 
@@ -144,7 +145,7 @@ export async function register(req: Request, res: Response) {
       201,
     );
   } catch (error) {
-    return errorResponse(res, "Something went wrong", 500);
+    return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR);
   }
 }
 
@@ -159,7 +160,7 @@ export async function login(req: Request, res: Response) {
     const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
-      return errorResponse(res, "Invalid credentials", 401);
+      return errorResponse(res, "Invalid credentials", 401, ErrorCode.INVALID_CREDENTIALS, 401);
     }
     if (!user.is_active) {
       return errorResponse(res, "Your account has been deactivated. Please contact support.", 403);
@@ -167,7 +168,7 @@ export async function login(req: Request, res: Response) {
 
     const valid = await comparePassword(password, user.password_hash);
     if (!valid) {
-      return errorResponse(res, "Invalid credentials", 401);
+      return errorResponse(res, "Invalid credentials", 401, ErrorCode.INVALID_CREDENTIALS, 401);
     }
 
     const accessToken = signAccessToken({ userId: user.id, role: user.role });
@@ -197,7 +198,7 @@ export async function login(req: Request, res: Response) {
     );
   } catch (error) {
     console.error("Login error:", error);
-    return errorResponse(res, "Something went wrong", 500);
+    return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR);
   }
 }
 
@@ -213,7 +214,7 @@ export async function refresh(req: Request, res: Response) {
     try {
       payload = verifyRefreshToken(refreshToken);
     } catch {
-      return errorResponse(res, "Invalid or expired refresh token", 401);
+      return errorResponse(res, "Invalid or expired refresh token", 401, ErrorCode.TOKEN_INVALID, 401);
     }
 
     const stored = await prisma.refreshToken.findUnique({
@@ -221,7 +222,7 @@ export async function refresh(req: Request, res: Response) {
     });
 
     if (!stored || stored.revoked_at || stored.expires_at < new Date()) {
-      return errorResponse(res, "Invalid or expired refresh token", 401);
+      return errorResponse(res, "Invalid or expired refresh token", 401, ErrorCode.TOKEN_INVALID, 401);
     }
 
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });
@@ -253,7 +254,7 @@ export async function refresh(req: Request, res: Response) {
     );
   } catch (error) {
     console.error("Refresh error:", error);
-    return errorResponse(res, "Something went wrong", 500);
+    return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR);
   }
 }
 
@@ -272,6 +273,6 @@ export async function logout(req: Request, res: Response) {
 
     return successResponse(res, null, "Logged out successfully");
   } catch (error) {
-    return errorResponse(res, "Something went wrong", 500);
+    return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR);
   }
 }
