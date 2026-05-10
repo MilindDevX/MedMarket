@@ -1,11 +1,74 @@
 import usePageTitle from '../../utils/usePageTitle';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck, MapPin, TrendingUp, AlertTriangle,
-  ArrowRight, CheckCircle, Store, Users, Package
+  ArrowRight, CheckCircle, Store, Users, Package, Copy, Check, X, ChevronDown
 } from 'lucide-react';
 import styles from './Landing.module.css';
+
+const DEMO_CREDS = [
+  { role: 'Admin',    email: 'milind@medmarket.in',         password: 'Admin@1234',    color: '#7C3AED', bg: '#F5F3FF' },
+  { role: 'Consumer', email: 'priya.sharma@gmail.com',      password: 'Consumer@1234', color: '#1A56DB', bg: '#EFF6FF' },
+  { role: 'Pharmacy', email: 'rahul.gupta@medplus.in',      password: 'Pharma@1234',   color: '#0C6B4E', bg: '#ECFDF5' },
+];
+
+function DemoBanner() {
+  const [open,    setOpen]    = useState(false);
+  const [copied,  setCopied]  = useState(null);
+
+  const copy = (text, key) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1800);
+    });
+  };
+
+  return (
+    <div style={{ position:'fixed', bottom:24, right:24, zIndex:999, fontFamily:'var(--font-body)' }}>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="panel"
+            initial={{ opacity:0, y:12, scale:0.97 }}
+            animate={{ opacity:1, y:0,  scale:1    }}
+            exit={{    opacity:0, y:12, scale:0.97 }}
+            transition={{ duration:0.18 }}
+            style={{ marginBottom:10, background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16, boxShadow:'0 8px 32px rgba(0,0,0,0.12)', padding:20, width:320 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+              <span style={{ fontWeight:700, fontSize:14, color:'var(--ink-900)' }}>Demo Credentials</span>
+              <button onClick={() => setOpen(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--ink-400)', padding:2 }}><X size={16}/></button>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {DEMO_CREDS.map(({ role, email, password, color, bg }) => (
+                <div key={role} style={{ background:bg, borderRadius:10, padding:'10px 12px' }}>
+                  <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color, marginBottom:6 }}>{role}</div>
+                  {[{ label:'Email', val:email, key:`${role}-e` }, { label:'Pass', val:password, key:`${role}-p` }].map(({ label, val, key }) => (
+                    <div key={key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:3 }}>
+                      <span style={{ fontSize:12, color:'var(--ink-500)', width:36 }}>{label}</span>
+                      <span style={{ fontSize:12, fontFamily:'monospace', color:'var(--ink-800)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{val}</span>
+                      <button onClick={() => copy(val, key)}
+                        style={{ marginLeft:6, background:'none', border:'none', cursor:'pointer', color: copied===key ? color : 'var(--ink-400)', padding:2, flexShrink:0 }}>
+                        {copied === key ? <Check size={13}/> : <Copy size={13}/>}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize:11, color:'var(--ink-400)', marginTop:12, marginBottom:0 }}>Run <code style={{ fontFamily:'monospace', background:'var(--ink-100)', padding:'1px 4px', borderRadius:4 }}>npm run db:seed</code> first to create these accounts.</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <button onClick={() => setOpen(o => !o)}
+        style={{ display:'flex', alignItems:'center', gap:8, background:'var(--ink-900)', color:'var(--white)', border:'none', borderRadius:99, padding:'10px 18px', fontWeight:600, fontSize:13, cursor:'pointer', boxShadow:'0 4px 16px rgba(0,0,0,0.2)', fontFamily:'var(--font-body)' }}>
+        Demo Credentials <ChevronDown size={14} style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)', transition:'transform 0.2s' }}/>
+      </button>
+    </div>
+  );
+}
 
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 32 },
@@ -343,6 +406,7 @@ export default function Landing() {
           </div>
         </div>
       </footer>
+      <DemoBanner />
     </div>
   );
 }
