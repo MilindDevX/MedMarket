@@ -32,8 +32,11 @@ export default function MyOrders() {
       ? !['delivered','cancelled','rejected'].includes(o.status)
       : ['delivered','cancelled','rejected'].includes(o.status)
   );
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+  // Only paginate the past tab — active orders show all in-progress items
+  const totalPages = tab === 'past' ? Math.ceil(filtered.length / PAGE_SIZE) : 1;
+  const paginated  = tab === 'past'
+    ? filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE)
+    : filtered;
 
   const handleCancel = async () => {
     try {
@@ -56,7 +59,7 @@ export default function MyOrders() {
 
       <div style={{ display:'flex', gap:'var(--sp-2)', marginBottom:'var(--sp-5)' }}>
         {['active','past'].map(t => (
-          <button key={t} onClick={() => setTab(t)}
+          <button key={t} onClick={() => { setTab(t); setPage(1); }}
             style={{ padding:'8px 20px', borderRadius:'var(--r-md)', fontSize:14, fontWeight:600, cursor:'pointer', border:'1.5px solid', borderColor: tab===t ? 'var(--green-700)' : 'var(--ink-200)', background: tab===t ? 'var(--green-50)' : 'var(--white)', color: tab===t ? 'var(--green-700)' : 'var(--ink-500)', transition:'all 0.15s', fontFamily:'var(--font-body)' }}>
             {t === 'active' ? 'Active' : 'Past Orders'}
           </button>
@@ -140,7 +143,9 @@ export default function MyOrders() {
         </div>
       )}
       
-      <Pagination page={page} totalPages={totalPages} onPageChange={p => setPage(p)} />
+      {tab === 'past' && (
+        <Pagination page={page} totalPages={totalPages} onPageChange={p => setPage(p)} />
+      )}
 
       {/* Cancel confirmation modal */}
       <AnimatePresence>
