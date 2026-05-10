@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, X, Edit2, Trash2, AlertTriangle, CheckCircle, Database } from 'lucide-react';
 import Badge from '../../components/ui/Badge';
+import Pagination from '../../components/ui/Pagination';
 import useToastStore from '../../store/toastStore';
 import { useAdminMedicines } from '../../hooks/useAdminMedicines';
 import { SkeletonTable } from '../../components/ui/Skeleton';
@@ -24,6 +25,8 @@ export default function AdminMedicines() {
   const [showModal,   setShowModal]   = useState(false);
   const [editingId,   setEditingId]   = useState(null);
   const [form,        setForm]        = useState(emptyForm);
+  const [page,        setPage]        = useState(1);
+  const PAGE_SIZE = 20;
   const toast = useToastStore();
   const { allMedicines, loading, create, update, deactivate } = useAdminMedicines();
 
@@ -38,6 +41,11 @@ export default function AdminMedicines() {
     const matchSched = schedFilter === 'all' || m.schedule === schedFilter;
     return matchSearch && matchCat && matchSched;
   });
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleFilterChange = (setter) => (e) => { setter(e.target.value); setPage(1); };
 
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -82,12 +90,12 @@ export default function AdminMedicines() {
       <div className={styles.filters}>
         <div className={styles.searchWrap}>
           <Search size={14} className={styles.searchIcon} />
-          <input className={styles.searchInput} value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, salt, generic name..." />
+          <input className={styles.searchInput} value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search name, salt, generic name..." />
         </div>
-        <select className={styles.filterSelect} value={catFilter} onChange={e => setCatFilter(e.target.value)}>
+        <select className={styles.filterSelect} value={catFilter} onChange={handleFilterChange(setCatFilter)}>
           {medicineCategories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select className={styles.filterSelect} value={schedFilter} onChange={e => setSchedFilter(e.target.value)}>
+        <select className={styles.filterSelect} value={schedFilter} onChange={handleFilterChange(setSchedFilter)}>
           <option value="all">All Schedules</option>
           {scheduleOptions.map(s => <option key={s} value={s}>{scheduleLabel[s]}</option>)}
         </select>
@@ -101,7 +109,7 @@ export default function AdminMedicines() {
             ))}</tr>
           </thead>
           <tbody>
-            {filtered.map((m, i) => (
+            {paginated.map((m, i) => (
               <motion.tr key={m.id} className={styles.tr}
                 initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:i*0.04 }}>
                 <td className={styles.td}>
@@ -130,6 +138,8 @@ export default function AdminMedicines() {
           <div className={styles.empty}><Database size={32} strokeWidth={1} /><p>No medicines found.</p></div>
         )}
       </div>
+
+      <Pagination page={page} totalPages={totalPages} onPageChange={p => setPage(p)} />
 
       <AnimatePresence>
         {showModal && (

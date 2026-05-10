@@ -31,7 +31,7 @@ export default function AdminOrders() {
   const [status,    setStatus]    = useState('all');
   const [expanded,  setExpanded]  = useState(null);
   const [page,      setPage]      = useState(1);
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 25;
   const { orders, loading }       = useAdminOrders();
 
   const filtered = orders.filter(o => {

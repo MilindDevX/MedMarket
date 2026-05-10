@@ -17,7 +17,7 @@ export default function AdminPharmacies() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [page,   setPage]   = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 20;
   const toast = useToastStore();
   const { apps, loading, approve, reject, suspend } = useAdminPharmacies(filter === 'all' ? '' : filter);
 
