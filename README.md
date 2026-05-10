@@ -1,5 +1,11 @@
 # MedMarket India
 
+[![CI](https://github.com/your-org/medmarket/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/medmarket/actions/workflows/ci.yml)
+[![Backend Tests](https://img.shields.io/badge/backend%20tests-38%20passing-brightgreen)](https://github.com/your-org/medmarket/actions)
+[![Frontend Tests](https://img.shields.io/badge/frontend%20tests-20%20passing-brightgreen)](https://github.com/your-org/medmarket/actions)
+[![API Docs](https://img.shields.io/badge/API%20docs-Swagger%20UI-85EA2D?logo=swagger)](https://medmarket-backend.onrender.com/api/docs)
+[![License](https://img.shields.io/badge/license-ISC-blue)](./LICENSE)
+
 > A location-aware, multi-sided digital marketplace connecting verified pharmacies with consumers across India — built for regulatory compliance under the Drugs & Cosmetics Act, CDSCO guidelines, and Drug Price Control Order (DPCO).
 
 ---
@@ -122,6 +128,17 @@ The platform has three distinct portals — Consumer, Pharmacy, and Admin — ea
 ---
 
 ## Getting Started
+
+### Option A — Docker Compose (fastest)
+
+```bash
+cp backend/.env.example backend/.env   # add Cloudinary + JWT secrets
+docker compose up --build
+```
+
+Backend: `http://localhost:3000` · API Docs: `http://localhost:3000/api/docs`
+
+### Option B — Manual Setup
 
 ### Prerequisites
 
