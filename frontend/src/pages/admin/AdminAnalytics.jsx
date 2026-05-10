@@ -1,7 +1,7 @@
 import usePageTitle from '../../utils/usePageTitle';
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, MapPin, Store, ShoppingCart, Users, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { TrendingUp, MapPin, Store, ShoppingCart, Users, Clock, CheckCircle, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend,
@@ -10,7 +10,6 @@ import {
 import { useAdminPharmacies } from '../../hooks/useAdminPharmacies';
 import { useAdminOrders } from '../../hooks/useAdminOrders';
 import { useAdminUsers } from '../../hooks/useAdminUsers';
-import { usePharmacyAnalytics } from '../../hooks/usePharmacyAnalytics';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 
 const fmtMoney = (v) => {
@@ -34,12 +33,10 @@ export default function AdminAnalytics() {
   const { apps,   loading: appsLoading   } = useAdminPharmacies('');
   const { orders, loading: ordersLoading } = useAdminOrders();
   const { users,  loading: usersLoading  } = useAdminUsers();
-  
-  const [selectedPharmacyId, setSelectedPharmacyId] = useState('');
-  const { 
-    analytics: pharmacyStats, 
-    loading: pharmacyLoading 
-  } = usePharmacyAnalytics(selectedPharmacyId);
+
+  const [activeTab, setActiveTab]   = useState('overview');  // 'overview' | 'breakdown'
+  const [sortKey,   setSortKey]     = useState('orders');
+  const [sortDir,   setSortDir]     = useState('desc');
 
   const loading = appsLoading || ordersLoading || usersLoading;
 
@@ -133,9 +130,63 @@ export default function AdminAnalytics() {
       avgTurnaround: Math.round(avgTurnaround),
       totalConsumers, activationRate,
       gmvByDay, cityRanking, topMedicines, storeStatusDist, regByDay,
-      approvedStoresList: apps.filter(a => a.status === 'approved')
+
+      // Pharmacy breakdown table — one row per approved store
+      pharmacyRows: apps.filter(a => a.status === 'approved').map(store => {
+        const storeOrders    = orders.filter(o => o.store_id === store.id);
+        const delivered      = storeOrders.filter(o => o.status === 'delivered');
+        const terminal       = storeOrders.filter(o => ['delivered','rejected','cancelled'].includes(o.status));
+        const gmv            = delivered.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+        const avgOrderVal    = delivered.length > 0 ? gmv / delivered.length : 0;
+        const fulfillRate    = terminal.length  > 0 ? Math.round(delivered.length / terminal.length * 100) : 0;
+        const lastOrderDate  = storeOrders.length > 0
+          ? storeOrders.reduce((latest, o) => o.created_at > latest ? o.created_at : latest, '')
+          : null;
+        return {
+          id:          store.id,
+          name:        store.name,
+          city:        store.city || '—',
+          orders:      storeOrders.length,
+          gmv,
+          fulfillRate,
+          avgOrderVal,
+          lastActive:  lastOrderDate,
+        };
+      }),
     };
   }, [apps, orders, users]);
+
+  // Sort pharmacy breakdown table — must be before any early return (Rules of Hooks)
+  const {
+    totalGmv, avgOrder: _avgOrder, totalOrders, deliveredOrders: _del,
+    fulfillmentRate, rejectionRate,
+    totalStores: _ts, approvedStores, pendingStores, avgTurnaround,
+    totalConsumers: _tc, activationRate,
+    gmvByDay, cityRanking, topMedicines, storeStatusDist, regByDay,
+    pharmacyRows = [],
+  } = stats;
+  const sortedRows = useMemo(() => {
+    return [...pharmacyRows].sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey];
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [pharmacyRows, sortKey, sortDir]);
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('desc'); }
+  };
+
+  const SortIcon = ({ col }) => {
+    if (sortKey !== col) return <ChevronsUpDown size={12} style={{ color:'var(--ink-300)', marginLeft:3 }} />;
+    return sortDir === 'asc'
+      ? <ChevronUp   size={12} style={{ color:'var(--green-700)', marginLeft:3 }} />
+      : <ChevronDown size={12} style={{ color:'var(--green-700)', marginLeft:3 }} />;
+  };
 
   if (loading) return (
     <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-5)' }}>
@@ -146,21 +197,33 @@ export default function AdminAnalytics() {
     </div>
   );
 
-  const {
-    totalGmv, avgOrder: _avgOrder, totalOrders, deliveredOrders: _del,
-    fulfillmentRate, rejectionRate,
-    totalStores: _ts, approvedStores, pendingStores, avgTurnaround,
-    totalConsumers: _tc, activationRate,
-    gmvByDay, cityRanking, topMedicines, storeStatusDist, regByDay,
-  } = stats;
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-5)' }}>
-      <div>
-        <h1 style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:600, color:'var(--ink-900)', letterSpacing:'-0.3px' }}>Platform Analytics</h1>
-        <p style={{ fontSize:13, color:'var(--ink-500)', marginTop:4 }}>Live platform-wide metrics across all stores and consumers.</p>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'var(--sp-3)' }}>
+        <div>
+          <h1 style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:600, color:'var(--ink-900)', letterSpacing:'-0.3px' }}>Platform Analytics</h1>
+          <p style={{ fontSize:13, color:'var(--ink-500)', marginTop:4 }}>Live platform-wide metrics across all stores and consumers.</p>
+        </div>
+        {/* ── Tab Switcher ── */}
+        <div style={{ display:'flex', background:'var(--ink-100)', borderRadius:10, padding:3, gap:3 }}>
+          {[
+            { id:'overview',   label:'Platform Overview' },
+            { id:'breakdown',  label:'Pharmacy Breakdown' },
+          ].map(({ id, label }) => (
+            <button key={id} onClick={() => setActiveTab(id)}
+              style={{ padding:'7px 18px', borderRadius:8, fontSize:13, fontWeight:600, border:'none', cursor:'pointer', fontFamily:'var(--font-body)', transition:'all 0.15s',
+                background: activeTab === id ? 'var(--white)'     : 'transparent',
+                color:      activeTab === id ? 'var(--ink-900)'   : 'var(--ink-500)',
+                boxShadow:  activeTab === id ? 'var(--shadow-sm)' : 'none',
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {activeTab === 'overview' && (<>
       {/* ── KPIs ── */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:'var(--sp-4)' }}>
         {[
@@ -341,55 +404,90 @@ export default function AdminAnalytics() {
           </div>
         </div>
       </div>
-      {/* ── Pharmacy Breakdown ── */}
-      <div style={{ ...card, marginTop:'var(--sp-5)' }}>
-        <div style={{ ...cardTitle, display:'flex', justifyContent:'space-between', borderBottom:'1px solid var(--ink-100)', paddingBottom:'var(--sp-3)', marginBottom:'var(--sp-4)' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <Store size={17} strokeWidth={1.8} style={{ color:'var(--blue-700)' }} />
-            Pharmacy Breakdown
-          </div>
-          <select 
-            value={selectedPharmacyId} 
-            onChange={e => setSelectedPharmacyId(e.target.value)}
-            style={{ padding:'6px 12px', borderRadius:'var(--r-sm)', border:'1px solid var(--ink-200)', fontSize:13, fontFamily:'var(--font-body)', outline:'none', color: selectedPharmacyId ? 'var(--ink-900)' : 'var(--ink-500)', background:'var(--white)', minWidth:200 }}>
-            <option value="">Select a pharmacy...</option>
-            {/* Using active stores from the dashboard stats for the dropdown options */}
-            {stats.approvedStoresList?.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
+      </>)}
 
-        {!selectedPharmacyId ? (
-          <div style={{ textAlign:'center', padding:'var(--sp-8)', color:'var(--ink-400)', fontSize:14 }}>
-            Select a pharmacy above to view its detailed performance analytics.
+      {/* ── Pharmacy Breakdown Tab ── */}
+      {activeTab === 'breakdown' && (
+        <div style={card}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'var(--sp-4)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <Store size={17} strokeWidth={1.8} style={{ color:'var(--blue-700)' }} />
+              <span style={{ fontSize:16, fontWeight:700, color:'var(--ink-900)' }}>
+                All Approved Stores ({sortedRows.length})
+              </span>
+            </div>
+            <span style={{ fontSize:12, color:'var(--ink-400)' }}>Click column headers to sort</span>
           </div>
-        ) : pharmacyLoading ? (
-          <div style={{ textAlign:'center', padding:'var(--sp-8)', color:'var(--ink-400)' }}>Loading pharmacy stats...</div>
-        ) : pharmacyStats ? (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:'var(--sp-4)' }}>
-            <div style={{ padding:'var(--sp-4)', background:'var(--ink-50)', borderRadius:12 }}>
-              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:'var(--ink-500)', marginBottom:4 }}>Total GMV</div>
-              <div style={{ fontSize:20, fontWeight:700, color:'var(--green-700)' }}>{fmtMoney(pharmacyStats.total_gmv)}</div>
+
+          {sortedRows.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'var(--sp-10)', color:'var(--ink-400)', fontSize:14 }}>
+              No approved stores yet.
             </div>
-            <div style={{ padding:'var(--sp-4)', background:'var(--ink-50)', borderRadius:12 }}>
-              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:'var(--ink-500)', marginBottom:4 }}>Total Orders</div>
-              <div style={{ fontSize:20, fontWeight:700, color:'var(--blue-700)' }}>{pharmacyStats.total_orders}</div>
+          ) : (
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                <thead>
+                  <tr style={{ borderBottom:'2px solid var(--ink-200)', background:'var(--ink-50)' }}>
+                    {[
+                      { key:'name',        label:'Store Name',      align:'left'  },
+                      { key:'city',        label:'City',            align:'left'  },
+                      { key:'orders',      label:'Orders',          align:'right' },
+                      { key:'gmv',         label:'GMV',             align:'right' },
+                      { key:'fulfillRate', label:'Fulfillment %',   align:'right' },
+                      { key:'avgOrderVal', label:'Avg Order Value', align:'right' },
+                      { key:'lastActive',  label:'Last Active',     align:'right' },
+                    ].map(({ key, label, align }) => (
+                      <th key={key} onClick={() => handleSort(key)}
+                        style={{ padding:'10px 12px', textAlign:align, fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.05em', color: sortKey===key ? 'var(--green-700)' : 'var(--ink-400)', cursor:'pointer', userSelect:'none', whiteSpace:'nowrap' }}>
+                        <span style={{ display:'inline-flex', alignItems:'center' }}>
+                          {label}<SortIcon col={key} />
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedRows.map((row, i) => (
+                    <motion.tr key={row.id}
+                      initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:i*0.03 }}
+                      style={{ borderBottom:'1px solid var(--ink-100)', transition:'background 0.1s' }}
+                      onMouseEnter={e => e.currentTarget.style.background='var(--ink-50)'}
+                      onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                      <td style={{ padding:'12px 12px', fontWeight:600, color:'var(--ink-900)', maxWidth:200 }}>
+                        <div style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{row.name}</div>
+                      </td>
+                      <td style={{ padding:'12px 12px', color:'var(--ink-600)' }}>{row.city}</td>
+                      <td style={{ padding:'12px 12px', textAlign:'right', fontWeight:700, color:'var(--blue-700)' }}>{row.orders}</td>
+                      <td style={{ padding:'12px 12px', textAlign:'right', fontWeight:700, color:'var(--green-700)' }}>{fmtMoney(row.gmv)}</td>
+                      <td style={{ padding:'12px 12px', textAlign:'right' }}>
+                        {row.orders === 0 ? <span style={{ color:'var(--ink-300)' }}>—</span> : (
+                          <span style={{
+                            fontWeight:700, fontSize:12, padding:'3px 9px', borderRadius:9999,
+                            color:      row.fulfillRate >= 80 ? 'var(--success-dark)'  : row.fulfillRate >= 50 ? 'var(--warning-dark)' : 'var(--danger)',
+                            background: row.fulfillRate >= 80 ? 'var(--success-light)' : row.fulfillRate >= 50 ? 'var(--warning-light)' : 'var(--danger-light)',
+                          }}>
+                            {row.fulfillRate}%
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding:'12px 12px', textAlign:'right', color:'var(--ink-700)', fontWeight:600 }}>
+                        {row.orders === 0 ? <span style={{ color:'var(--ink-300)' }}>—</span> : fmtMoney(row.avgOrderVal)}
+                      </td>
+                      <td style={{ padding:'12px 12px', textAlign:'right', color:'var(--ink-500)', fontSize:12 }}>
+                        {row.lastActive
+                          ? new Date(row.lastActive).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
+                          : <span style={{ color:'var(--ink-300)' }}>No orders</span>}
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div style={{ padding:'var(--sp-4)', background:'var(--ink-50)', borderRadius:12 }}>
-              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:'var(--ink-500)', marginBottom:4 }}>Fulfillment Rate</div>
-              <div style={{ fontSize:20, fontWeight:700, color:'var(--success-dark)' }}>{pharmacyStats.fulfillment_rate}%</div>
-            </div>
-            <div style={{ padding:'var(--sp-4)', background:'var(--ink-50)', borderRadius:12 }}>
-              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:'var(--ink-500)', marginBottom:4 }}>Complaints</div>
-              <div style={{ fontSize:20, fontWeight:700, color: pharmacyStats.complaints_count > 0 ? 'var(--warning-dark)' : 'var(--ink-900)' }}>{pharmacyStats.complaints_count}</div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ textAlign:'center', padding:'var(--sp-8)', color:'var(--danger)', fontSize:14 }}>Failed to load stats.</div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
     </div>
   );
 }
+
