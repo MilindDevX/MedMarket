@@ -1,7 +1,7 @@
 import usePageTitle from '../../utils/usePageTitle';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Package, AlertTriangle, X, CheckCircle, Trash2 } from 'lucide-react';
+import { Search, Plus, Package, AlertTriangle, X, CheckCircle, Trash2, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useInventory } from '../../hooks/useInventory';
 import { useMedicines } from '../../hooks/useMedicines';
@@ -11,8 +11,30 @@ import { SkeletonTable } from '../../components/ui/Skeleton';
 import Pagination from '../../components/ui/Pagination';
 import styles from './PharmacyInventory.module.css';
 
+const getRiskScore = (item) => {
+  if (!item.exp_date) return 0;
+  const daysLeft = Math.floor((new Date(item.exp_date) - new Date()) / (1000*60*60*24));
+  if (daysLeft < 0 || daysLeft > 30) return 0;
+  return (30 - daysLeft) * (item.quantity || 0);
+};
+
+const riskLevel = (score) => {
+  if (score === 0)   return 'none';
+  if (score <= 50)   return 'low';
+  if (score <= 200)  return 'medium';
+  return 'high';
+};
+
+const riskStyle = {
+  none:   { color: 'var(--ink-300)',       background: 'transparent',         label: '—'     },
+  low:    { color: 'var(--success-dark)',   background: 'var(--success-light)', label: 'Low'   },
+  medium: { color: 'var(--warning-dark)',   background: 'var(--warning-light)', label: 'Med'   },
+  high:   { color: 'var(--danger)',         background: 'var(--danger-light)',  label: 'High'  },
+};
+
 const getStatus = (item) => {
   if (!item.exp_date) return 'ok';
+
   const daysLeft = Math.floor((new Date(item.exp_date) - new Date()) / (1000*60*60*24));
   if (daysLeft < 0)  return 'expired';
   if (daysLeft < 30) return 'expiring-critical';
@@ -48,6 +70,7 @@ export default function PharmacyInventory() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm]             = useState(emptyForm);
   const [page, setPage]             = useState(1);
+  const [sortByRisk, setSortByRisk] = useState(false);
   const PAGE_SIZE = 15;
   const toast = useToastStore();
 
@@ -59,7 +82,11 @@ export default function PharmacyInventory() {
     return () => window.removeEventListener('keydown', h);
   }, []);
 
-  const enriched = inventory.map(i => ({ ...i, status: getStatus(i) }));
+  const enriched = inventory.map(i => ({
+    ...i,
+    status:     getStatus(i),
+    risk_score: i.risk_score ?? getRiskScore(i),  // prefer server value, fall back to client
+  }));
 
   const filtered = enriched.filter(item => {
     const q = search.toLowerCase();
@@ -70,8 +97,12 @@ export default function PharmacyInventory() {
       (filter === 'alerts' && ['expiring-soon','expiring-critical','expired','low'].includes(item.status));
     return matchSearch && matchFilter;
   });
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
+  const sorted = sortByRisk
+    ? [...filtered].sort((a, b) => b.risk_score - a.risk_score)
+    : filtered;
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+  const paginated  = sorted.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const alertCount = enriched.filter(i => ['expiring-soon','expiring-critical','expired','low'].includes(i.status)).length;
 
@@ -155,19 +186,31 @@ export default function PharmacyInventory() {
         </div>
         <div className={styles.filterBtns}>
           {filterOptions.map(f => (
-            <button key={f} onClick={() => setFilter(f)}
+            <button key={f} onClick={() => { setFilter(f); setPage(1); }}
               className={`${styles.filterBtn} ${filter === f ? styles.filterBtnActive : ''}`}>
               {filterLabels[f]}
             </button>
           ))}
+          <button
+            onClick={() => { setSortByRisk(r => !r); setPage(1); }}
+            className={`${styles.filterBtn} ${sortByRisk ? styles.filterBtnActive : ''}`}
+            title="Sort by Expiry Risk Score — highest urgency first"
+            style={{ display:'flex', alignItems:'center', gap:4, borderColor: sortByRisk ? 'var(--danger)' : undefined, color: sortByRisk ? 'var(--danger)' : undefined }}>
+            <TrendingUp size={12} strokeWidth={2.5} /> Risk Sort
+          </button>
         </div>
       </div>
 
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead className={styles.thead}>
-            <tr>{['Medicine','Salt','Batch No.','Expiry','Stock','Price','Status','Actions'].map(h => (
-              <th key={h} className={styles.th}>{h}</th>
+            <tr>{['Medicine','Salt','Batch No.','Expiry','Stock','Price','Risk','Status','Actions'].map(h => (
+              <th key={h} className={styles.th}
+                style={h === 'Risk' ? { color: sortByRisk ? 'var(--danger)' : undefined, cursor:'pointer' } : undefined}
+                onClick={h === 'Risk' ? () => { setSortByRisk(r => !r); setPage(1); } : undefined}
+                title={h === 'Risk' ? 'Expiry Risk Score = (30 − days_to_expiry) × quantity. Click to sort.' : undefined}>
+                {h === 'Risk' ? <span style={{ display:'flex', alignItems:'center', gap:3 }}><TrendingUp size={11} strokeWidth={2.5}/>{h}</span> : h}
+              </th>
             ))}</tr>
           </thead>
           <tbody>
@@ -187,6 +230,21 @@ export default function PharmacyInventory() {
                   <td className={styles.td}><span className={expClass}>{item.exp_date?.split('T')[0]}</span></td>
                   <td className={styles.td}><span className={item.quantity < 15 ? styles.qtyLow : styles.qtyOk}>{item.quantity}</span></td>
                   <td className={styles.td}><span className={styles.mrp}>₹{item.selling_price}</span></td>
+                  <td className={styles.td}>
+                    {(() => {
+                      const level = riskLevel(item.risk_score);
+                      const { color, background, label } = riskStyle[level];
+                      return level === 'none'
+                        ? <span style={{ color:'var(--ink-300)', fontSize:13 }}>—</span>
+                        : (
+                          <span title={`Risk score: ${item.risk_score}`}
+                            style={{ display:'inline-flex', alignItems:'center', gap:4, fontWeight:700, fontSize:12, padding:'3px 9px', borderRadius:9999, color, background }}>
+                            <TrendingUp size={11} strokeWidth={2.5} />{label}
+                            <span style={{ fontWeight:400, fontSize:11, opacity:0.75 }}>({item.risk_score})</span>
+                          </span>
+                        );
+                    })()}
+                  </td>
                   <td className={styles.td}><Badge variant={badge}>{label}</Badge></td>
                   <td className={styles.td}>
                     <div className={styles.rowActions}>
@@ -201,7 +259,7 @@ export default function PharmacyInventory() {
             })}
           </tbody>
         </table>
-        {filtered.length === 0 && (
+        {sorted.length === 0 && (
           <div className={styles.empty}><Package size={32} strokeWidth={1} /><p>No medicines match your search.</p></div>
         )}
       </div>
