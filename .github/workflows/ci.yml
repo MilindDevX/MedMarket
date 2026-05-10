@@ -7,23 +7,36 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        
+        cache: 'npm'
+        cache-dependency-path: |
+          backend/package-lock.json
+          frontend/package-lock.json
+
     - name: Install Dependencies
       run: |
-        cd backend && npm ci
+        cd backend  && npm ci
         cd ../frontend && npm ci
-        
+
+    # ── Backend ──────────────────────────────────────────────
+    - name: Typecheck Backend
+      run: cd backend && npm run typecheck
+
     - name: Test Backend
       run: cd backend && npm test
-      
+
+    # ── Frontend ─────────────────────────────────────────────
+    - name: Lint Frontend
+      run: cd frontend && npm run lint
+
     - name: Test Frontend
       run: cd frontend && npm test
