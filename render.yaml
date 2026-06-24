@@ -6,8 +6,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22
-    buildCommand: npm install -g pnpm && pnpm install && pnpm run build
-    startCommand: pnpm start
+    buildCommand: npm install -g pnpm && NODE_ENV=development pnpm install && pnpm run build
+    startCommand: node dist/index.js
     healthCheckPath: /health
   - type: cron
     name: keep-backend-warm
