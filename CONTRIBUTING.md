@@ -8,7 +8,7 @@ Thank you for taking the time to contribute. This document covers setup, branch 
 
 ```bash
 # 1. Clone
-git clone https://github.com/<your-org>/medmarket.git
+git clone https://github.com/MilindDevX/MedMarket.git
 cd medmarket
 
 # 2. Backend

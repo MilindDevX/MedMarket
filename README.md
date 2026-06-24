@@ -1,9 +1,9 @@
-11# MedMarket India
+# MedMarket India
 
 [![CI](https://github.com/MilindDevX/MedMarket/actions/workflows/ci.yml/badge.svg)](https://github.com/MilindDevX/MedMarket/actions/workflows/ci.yml)
 [![Backend Tests](https://img.shields.io/badge/backend%20tests-38%20passing-brightgreen)](https://github.com/MilindDevX/MedMarket/actions)
 [![Frontend Tests](https://img.shields.io/badge/frontend%20tests-20%20passing-brightgreen)](https://github.com/MilindDevX/MedMarket/actions)
-[![API Docs](https://img.shields.io/badge/API%20docs-Swagger%20UI-85EA2D?logo=swagger)](https://medmarket-backend.onrender.com/api/docs)
+[![API Docs](https://img.shields.io/badge/API%20docs-Swagger%20UI-85EA2D?logo=swagger)](https://medmarket-g08v.onrender.com/api/docs)
 [![License](https://img.shields.io/badge/license-ISC-blue)](./LICENSE)
 
 > A location-aware, multi-sided digital marketplace connecting verified pharmacies with consumers across India — built for regulatory compliance under the Drugs & Cosmetics Act, CDSCO guidelines, and Drug Price Control Order (DPCO).
@@ -24,6 +24,8 @@
 - [API Overview](#api-overview)
 - [Regulatory Compliance](#regulatory-compliance)
 - [Test Credentials](#test-credentials)
+- [Running Tests](#running-tests)
+- [Health Check](#health-check)
 
 ---
 
@@ -281,7 +283,7 @@ npm install && npx prisma migrate deploy && npm run build
 
 | Variable | Value |
 |---|---|
-| `VITE_API_URL` | `https://your-backend.onrender.com/api/v1` |
+| `VITE_API_URL` | `https://<your-backend>.onrender.com/api/v1` |
 
 ---
 
