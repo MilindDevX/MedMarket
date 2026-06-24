@@ -3,8 +3,11 @@ services:
     name: medmarket-backend
     env: node
     rootDir: backend
-    buildCommand: npm install && npm run build
-    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+    buildCommand: npm install -g pnpm && pnpm install && pnpm run build
+    startCommand: pnpm start
     healthCheckPath: /health
   - type: cron
     name: keep-backend-warm

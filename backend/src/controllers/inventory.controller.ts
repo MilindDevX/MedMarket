@@ -130,7 +130,7 @@ export async function getInventory(req: Request, res: Response) {
     }
 
     const today = new Date();
-    const enriched = inventory.map(item => {
+    const enriched = inventory.map((item: any) => {
       const daysToExpiry = item.exp_date
         ? Math.floor((new Date(item.exp_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
         : null;

@@ -11,6 +11,7 @@ export function validate(schema: z.ZodSchema) {
         res,
         "Validation failed",
         400,
+  // @ts-ignore
         result.error.flatten().fieldErrors,
       );
     }

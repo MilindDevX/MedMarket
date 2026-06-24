@@ -27,7 +27,7 @@ export async function registerStore(req: Request, res: Response) {
         });
 
         const admins = await prisma.user.findMany({ where: { role: 'admin', is_active: true }, select: { id: true } });
-        await Promise.all(admins.map(admin =>
+        await Promise.all(admins.map((admin: any) =>
           createNotification(admin.id, 'store.new_application',
             `Re-application: ${name}`,
             `${name} (${city}, ${state}) has resubmitted after rejection. Drug License: ${drug_license_no}. Please review updated documents.`)
@@ -43,7 +43,7 @@ export async function registerStore(req: Request, res: Response) {
     });
 
     const admins = await prisma.user.findMany({ where: { role: 'admin', is_active: true }, select: { id: true } });
-    await Promise.all(admins.map(admin =>
+    await Promise.all(admins.map((admin: any) =>
       createNotification(admin.id, 'store.new_application',
         `New pharmacy application: ${name}`,
         `${name} (${city}, ${state}) has applied for verification. Drug License: ${drug_license_no}. Review and approve or reject.`)

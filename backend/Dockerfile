@@ -1,23 +1,29 @@
 # ── Stage 1: Build ──────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
+
+# Enable corepack and install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 
-# Install deps first (layer caches unless package.json changes)
-COPY package*.json ./
-RUN npm ci --ignore-scripts
+# Install deps first (layer caches unless package.json/pnpm-lock.yaml changes)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy source and generate Prisma client
 COPY prisma ./prisma
-RUN npx prisma generate
+RUN pnpm exec prisma generate
 
 # Copy remaining source and build
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 
 # ── Stage 2: Production image ────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
+
+# Enable corepack and install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Non-root user for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
@@ -25,8 +31,8 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 
 # Only production deps
-COPY package*.json ./
-RUN npm ci --omit=dev --ignore-scripts
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 # Copy Prisma schema + generated client (needed at runtime for migrations)
 COPY --from=builder /app/prisma ./prisma
@@ -40,4 +46,4 @@ USER appuser
 EXPOSE 3000
 
 # Run migrations then start server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/index.js"]

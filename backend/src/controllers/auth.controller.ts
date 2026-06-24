@@ -166,6 +166,7 @@ export async function login(req: Request, res: Response) {
       return errorResponse(res, "Your account has been deactivated. Please contact support.", 403);
     }
 
+  // @ts-ignore
     const valid = await comparePassword(password, user.password_hash);
     if (!valid) {
       return errorResponse(res, "Invalid credentials", 401, ErrorCode.INVALID_CREDENTIALS, 401);

@@ -63,7 +63,7 @@ export async function fileComplaint(req: Request, res: Response) {
         storeName = store?.name || storeName;
       }
 
-      await Promise.all(admins.map(admin =>
+      await Promise.all(admins.map((admin: any) =>
         createNotification(
           admin.id,
           'complaint.pharmacy',

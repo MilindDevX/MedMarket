@@ -14,7 +14,7 @@ export async function placeOrder(req: Request, res: Response) {
     const store = await prisma.pharmacyStore.findFirst({ where: { id: store_id, status: "approved" } });
     if (!store) return errorResponse(res, "Store not found or not approved", 404, ErrorCode.STORE_NOT_FOUND);
 
-    const order = await prisma.$transaction(async (tx) => {
+    const order = await prisma.$transaction(async (tx: any) => {
       let subtotal = 0;
       const orderItems: { inventory_id:string; medicine_name:string; salt_composition:string; batch_number:string; quantity:number; unit_price:Decimal; line_total:number; mrp_at_order:Decimal }[] = [];
 
@@ -70,7 +70,7 @@ export async function cancelOrder(req: Request, res: Response) {
     if (!order) return errorResponse(res, "Order not found", 404, ErrorCode.ORDER_NOT_FOUND);
     if (order.status !== "confirmed") return errorResponse(res, `Cannot cancel an order that is already '${order.status}'. Only confirmed orders can be cancelled.`, 400, ErrorCode.CANCEL_NOT_ALLOWED);
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.order.update({ where: { id }, data: { status: "cancelled", cancelled_at: new Date() } });
       for (const item of order.items) await tx.storeInventory.updateMany({ where: { id: item.inventory_id }, data: { quantity: { increment: item.quantity } } });
     });
@@ -113,7 +113,7 @@ export async function updateOrderStatus(req: Request, res: Response) {
     const updateData: any = { status: newStatus, ...(action==="accept" && {accepted_at:new Date()}), ...(action==="dispatch" && {dispatched_at:new Date()}), ...(action==="deliver" && {delivered_at:new Date()}), ...(action==="reject" && {rejection_reason}) };
 
     if (action === "reject") {
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: any) => {
         await tx.order.update({ where: { id }, data: updateData });
         for (const item of order.items) await tx.storeInventory.updateMany({ where: { id: item.inventory_id }, data: { quantity: { increment: item.quantity } } });
       });

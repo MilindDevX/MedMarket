@@ -13,30 +13,35 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: latest
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
-        cache: 'npm'
+        node-version: '22'
+        cache: 'pnpm'
         cache-dependency-path: |
-          backend/package-lock.json
-          frontend/package-lock.json
+          backend/pnpm-lock.yaml
+          frontend/pnpm-lock.yaml
 
     - name: Install Dependencies
       run: |
-        cd backend  && npm ci
-        cd ../frontend && npm ci
+        cd backend && pnpm install --frozen-lockfile
+        cd ../frontend && pnpm install --frozen-lockfile
 
     # ── Backend ──────────────────────────────────────────────
     - name: Typecheck Backend
-      run: cd backend && npm run typecheck
+      run: cd backend && pnpm run typecheck
 
     - name: Test Backend
-      run: cd backend && npm test
+      run: cd backend && pnpm test
 
     # ── Frontend ─────────────────────────────────────────────
     - name: Lint Frontend
-      run: cd frontend && npm run lint
+      run: cd frontend && pnpm run lint
 
     - name: Test Frontend
-      run: cd frontend && npm test
+      run: cd frontend && pnpm test
