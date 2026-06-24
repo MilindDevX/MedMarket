@@ -66,8 +66,8 @@ async function main() {
   console.log('✅ Database connected');
 
   // ── BullMQ — expiry notification queue ──
-  await initExpiryQueue();
-  await scheduleNightlyExpiryJob();
+  initExpiryQueue().catch(e => console.error(e));
+  scheduleNightlyExpiryJob().catch(e => console.error(e));
 
   app.listen(PORT, () => console.log(`🚀 MedMarket API running on port ${PORT}`));
 }
