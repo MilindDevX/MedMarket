@@ -40,6 +40,8 @@ app.use(generalLimiter);
 // ── API Docs — available at /api/docs ──
 mountSwagger(app);
 
+app.get('/', (_req, res) => res.redirect('/api/docs'));
+
 app.get('/health', (_req, res) => {
   res.json({ status:'ok', timestamp:new Date().toISOString(), service:'MedMarket API', version:'1.0.0' });
 });
