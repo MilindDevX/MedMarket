@@ -1,8 +1,8 @@
-# MedMarket India
+11# MedMarket India
 
-[![CI](https://github.com/your-org/medmarket/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/medmarket/actions/workflows/ci.yml)
-[![Backend Tests](https://img.shields.io/badge/backend%20tests-38%20passing-brightgreen)](https://github.com/your-org/medmarket/actions)
-[![Frontend Tests](https://img.shields.io/badge/frontend%20tests-20%20passing-brightgreen)](https://github.com/your-org/medmarket/actions)
+[![CI](https://github.com/MilindDevX/MedMarket/actions/workflows/ci.yml/badge.svg)](https://github.com/MilindDevX/MedMarket/actions/workflows/ci.yml)
+[![Backend Tests](https://img.shields.io/badge/backend%20tests-38%20passing-brightgreen)](https://github.com/MilindDevX/MedMarket/actions)
+[![Frontend Tests](https://img.shields.io/badge/frontend%20tests-20%20passing-brightgreen)](https://github.com/MilindDevX/MedMarket/actions)
 [![API Docs](https://img.shields.io/badge/API%20docs-Swagger%20UI-85EA2D?logo=swagger)](https://medmarket-backend.onrender.com/api/docs)
 [![License](https://img.shields.io/badge/license-ISC-blue)](./LICENSE)
 
