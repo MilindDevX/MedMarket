@@ -7,7 +7,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Planned
+- **Pharmacy Leaderboard** (Admin Panel)
+  - Overall rankings table: all approved pharmacies ranked by GMV, Orders, Fulfillment %, Avg Order Value, and Last Active — sortable by any column
+  - City-wise rankings: filter leaderboard by city to see local market leaders
+  - Rank badges: 🥇🥈🥉 for top 3; ⚠️ at-risk flag for bottom 20% (low fulfillment or inactive >7 days)
+  - Trend indicators (↑ ↓ →) based on week-over-week GMV change
+- **AI Platform Insights** (Admin Panel)
+  - New endpoint `GET /api/v1/admin/ai-insights` — aggregates platform-wide GMV, fulfillment rates, supply gaps, pending application backlog, and complaint clusters
+  - AI returns 5 platform-level insights grounded in leaderboard data (e.g. anomaly detection, supply gap cities, approval backlog impact)
+  - Uses existing `generateWithFallback()` with Gemini → Groq fallback — no new AI infra required
+  - Frontend: AI Insights card with Regenerate button displayed above the leaderboard on the Admin Analytics page
+
+---
+
+## [1.1.0] — 2026-06-26
+
 ### Added
+- **Dual-provider AI with automatic Groq fallback** (`src/lib/ai.ts`)
+  - New `generateWithFallback(prompt, imageData?)` function — single API for all AI calls
+  - Primary provider: Google Gemini 2.5 Flash (`@google/generative-ai`)
+  - Fallback provider: Groq `llama-3.3-70b-versatile` (`groq-sdk`) — activates automatically when Gemini returns `429`, `RESOURCE_EXHAUSTED`, `rate_limit`, `overloaded`, `503`, or an empty response
+  - Custom `AiUnavailableError` class with `provider` and `isQuota` fields for precise error handling
+  - `src/lib/gemini.ts` converted to a lightweight legacy shim that re-exports from `ai.ts`
+  - `GROQ_API_KEY` added to `.env.example`; `groq-sdk ^1.3` added to `package.json`
+  - Both AI endpoints (`verifyPharmacyDocuments`, `getPharmacyInsights`) return `HTTP 503` with human-readable messages instead of raw errors when both providers are unavailable
 - **BullMQ + Redis job queue** — nightly expiry notification pipeline (`ExpiryNotificationJob`)
   - `src/config/redis.ts` — Redis connection factory; supports local (`redis://`) and Upstash TLS (`rediss://`); gracefully disabled when `REDIS_URL` is unset
   - `src/queues/expiry.queue.ts` — BullMQ `Queue` + `Worker` bootstrap with retry (3× exponential back-off) and graceful shutdown hooks
@@ -39,6 +63,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Admin Analytics:** removed dependency on `usePharmacyAnalytics` hook from the analytics page
 
 ---
+
 
 ## [1.0.0] — 2026-03-22
 

@@ -14,6 +14,9 @@ cd medmarket
 # 2. Backend
 cd backend
 cp .env.example .env          # fill in your values
+#   Required: DATABASE_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET
+#   Required for AI: GEMINI_API_KEY (aistudio.google.com — free)
+#   Optional AI fallback: GROQ_API_KEY (console.groq.com — free, auto-used on Gemini quota)
 npm install
 npx prisma migrate deploy
 npx prisma generate
@@ -81,6 +84,7 @@ Before opening a PR, confirm all of the following:
 ## Code Style
 
 - **Backend:** TypeScript strict mode. Controllers stay thin — business logic belongs in services/repositories. Use the `sendSuccess` / `sendError` helpers from `src/utils/response.ts`.
+- **AI calls:** Always use `generateWithFallback()` from `src/lib/ai.ts` — never call `getFlashModel()` directly in new code. The fallback layer handles Gemini quota errors automatically.
 - **Frontend:** React functional components with hooks. CSS Modules only — no inline styles unless dynamically computed. Follow the existing token system in `src/styles/tokens.css`.
 - **No `any`** in TypeScript without a comment explaining why.
 

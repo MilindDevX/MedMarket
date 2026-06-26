@@ -51,15 +51,10 @@ The platform has three distinct portals — Consumer, Pharmacy, and Admin — ea
 │  Consumer Portal  │  Pharmacy Dashboard  │  Admin Panel  │
 └───────────────────┬─────────────────────────┘
                     │ HTTPS / JWT Bearer
-┌───────────────────▼─────────────────────────┐
+┌───────────────────┴─────────────────────────┐
 │         Express REST API  (/api/v1/*)        │
 │  Auth middleware → Role guard → Zod validate │
 │  Controllers → Services → Repositories       │
-└──────┬────────────────────────┬──────────────┘
-       │                        │
-┌──────▼──────┐          ┌──────▼──────┐
-│ PostgreSQL  │          │  Cloudinary │
-│  (Prisma)   │          │ (documents) │
 └─────────────┘          └─────────────┘
 ```
 
@@ -86,6 +81,8 @@ The platform has three distinct portals — Consumer, Pharmacy, and Admin — ea
 | Database | PostgreSQL 16 |
 | Auth | JWT (access 15 min + refresh 7 days with rotation) |
 | File storage | Cloudinary |
+| AI (primary) | Google Gemini 2.5 Flash (`@google/generative-ai`) |
+| AI (fallback) | Groq LLaMA 3.3 70B Versatile (`groq-sdk`) — auto-activates on quota/rate-limit |
 | Build | esbuild (not tsc — see [Why esbuild](#why-esbuild)) |
 | Testing | Vitest + Supertest (38 tests) |
 
@@ -122,10 +119,34 @@ The platform has three distinct portals — Consumer, Pharmacy, and Admin — ea
 
 ### Admin Panel (`/admin/*`)
 - Pharmacy application review with document viewer and verification checklist
+- **AI Document Verification** (`POST /admin/applications/:id/ai-verify`) — Gemini (+ Groq fallback) reads Drug License and GST Certificate images, extracts registration numbers, and cross-references them against submitted values
 - Approve / reject / suspend / reactivate pharmacies
 - Master medicine catalogue management (add, edit, deactivate, blacklist batches)
 - Platform-wide analytics: GMV trend, city-wise order heatmap, top medicines, consumer activation rate, pharmacy approval turnaround time
 - Complaint management and audit log
+
+---
+
+## AI Features
+
+MedMarket uses a dual-provider AI architecture defined in `backend/src/lib/ai.ts`.
+
+| Feature | Route | Primary AI | Fallback AI |
+|---|---|---|---|
+| **AI Document Verification** | `POST /admin/applications/:id/ai-verify` | Gemini 2.5 Flash (vision) | Groq LLaMA 3.3 70B (text-only with `UNREADABLE` fallback) |
+| **AI Pharmacy Insights** | `GET /ai/pharmacy/ai-insights` | Gemini 2.5 Flash | Groq LLaMA 3.3 70B |
+
+### Fallback logic
+
+The `generateWithFallback()` function in `src/lib/ai.ts` tries Gemini first. If Gemini returns any of the following errors, it **automatically retries on Groq** without any manual intervention:
+- HTTP `429` (Too Many Requests)
+- `RESOURCE_EXHAUSTED` / `quota exceeded`
+- `rate_limit` / `rate limit`
+- `overloaded` / `service unavailable` / `503`
+- `capacity` / `temporarily unavailable`
+- Empty response body
+
+If both providers are unavailable, the endpoint returns `HTTP 503` with a user-friendly message. Non-quota errors (e.g. content policy blocks) are re-thrown immediately without consuming Groq quota.
 
 ---
 
@@ -212,6 +233,8 @@ All sensitive values go in `backend/.env`. Never commit this file.
 | `CLOUDINARY_CLOUD_NAME` | `your_cloud` | Cloudinary document storage |
 | `CLOUDINARY_API_KEY` | `123456789` | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | `abc123...` | Cloudinary API secret |
+| `GEMINI_API_KEY` | (from aistudio.google.com) | Primary AI provider — free tier |
+| `GROQ_API_KEY` | (from console.groq.com) | Fallback AI provider — free tier, auto-activated on Gemini quota errors |
 
 Generate strong secrets with:
 ```bash
@@ -308,11 +331,16 @@ backend/
 │   ├── controllers/           # HTTP handlers (thin — no business logic)
 │   │   ├── auth.controller.ts
 │   │   ├── admin.controller.ts
+│   │   ├── ai.controller.ts       # AI endpoints (document verify + insights)
 │   │   ├── dashboard.controller.ts
 │   │   ├── inventory.controller.ts
 │   │   ├── order.controller.ts
 │   │   ├── settings.controller.ts
 │   │   └── ...
+│   ├── lib/
+│   │   ├── ai.ts                  # Unified AI client: Gemini → Groq fallback
+│   │   ├── gemini.ts              # Legacy shim (re-exports from ai.ts)
+│   │   └── cloudinary.ts          # Cloudinary client
 │   ├── middleware/            # Auth, role guards, rate limiting, validation
 │   ├── routes/                # Express routers
 │   ├── types/                 # Express request augmentation
@@ -388,16 +416,23 @@ All routes are prefixed with `/api/v1`. Authentication uses `Authorization: Bear
 
 ### Admin — `/admin`
 
-| Method | Route | Description |
-|---|---|---|
-| GET | `/admin/dashboard` | Platform KPIs |
-| GET/PATCH | `/admin/settings` | Platform-wide settings (GST %, COD limit, etc.) |
-| GET | `/admin/applications` | All pharmacy applications |
-| PATCH | `/admin/applications/:id/approve` | Approve pharmacy |
-| PATCH | `/admin/applications/:id/reject` | Reject with reason |
-| PATCH | `/admin/applications/:id/suspend` | Suspend active pharmacy |
-| GET/POST/PATCH/DELETE | `/admin/medicines` | Master medicine catalogue |
-| POST | `/admin/medicines/:id/blacklist-batch` | Blacklist a batch platform-wide |
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/admin/dashboard` | Admin | Platform KPIs |
+| GET/PATCH | `/admin/settings` | Admin | Platform-wide settings (GST %, COD limit, etc.) |
+| GET | `/admin/applications` | Admin | All pharmacy applications |
+| PATCH | `/admin/applications/:id/approve` | Admin | Approve pharmacy |
+| PATCH | `/admin/applications/:id/reject` | Admin | Reject with reason |
+| PATCH | `/admin/applications/:id/suspend` | Admin | Suspend active pharmacy |
+| POST | `/admin/applications/:id/ai-verify` | Admin | AI document verification (Gemini + Groq fallback) |
+| GET/POST/PATCH/DELETE | `/admin/medicines` | Admin | Master medicine catalogue |
+| POST | `/admin/medicines/:id/blacklist-batch` | Admin | Blacklist a batch platform-wide |
+
+### AI — `/ai`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/ai/pharmacy/ai-insights` | Pharmacy | AI-generated business insights (Gemini + Groq fallback) |
 
 ### Response envelope
 
@@ -481,4 +516,5 @@ Returns:
 
 ---
 
-*MedMarket India — Confidential | v1.0 | March 2026*
+*MedMarket India — Confidential | v1.1 | June 2026*
+
