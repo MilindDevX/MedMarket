@@ -5,6 +5,7 @@ import {
   updatePharmacyDetails, getAllOrders, listComplaints, updateComplaint,
   getPharmacyAnalytics,
 } from "../controllers/admin.controller.ts";
+import { verifyPharmacyDocuments } from "../controllers/ai.controller.ts";
 import { getDashboard }              from "../controllers/dashboard.controller.ts";
 import { getSettings, updateSettings } from "../controllers/settings.controller.ts";
 import { authenticate }              from "../middleware/auth.middleware.ts";
@@ -27,6 +28,7 @@ router.patch("/applications/:id/reactivate", authenticate, requireAdmin, reactiv
 router.patch("/applications/:id/reject",     authenticate, requireAdmin, rejectApplicaton);
 router.patch("/applications/:id/suspend",    authenticate, requireAdmin, suspendApplication);
 router.patch("/applications/:id",            authenticate, requireAdmin, updatePharmacyDetails);
+router.post("/applications/:id/ai-verify",   authenticate, requireAdmin, verifyPharmacyDocuments);
 
 // ── Users ──
 router.get("/users",                      authenticate, requireAdmin, listUsers);

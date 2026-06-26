@@ -22,6 +22,7 @@ import addressRouter      from './routes/address.routes.ts';
 import consumerRouter     from './routes/consumer.routes.ts';
 import notificationRouter from './routes/notification.routes.ts';
 import documentRouter     from './routes/document.routes.ts';
+import aiRouter           from './routes/ai.routes.ts';
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -57,6 +58,7 @@ app.use('/api/v1/stores',             storeRouter);
 app.use('/api/v1/consumer/addresses', addressRouter);
 app.use('/api/v1/notifications',      notificationRouter);
 app.use('/api/v1/consumer',           consumerRouter);
+app.use('/api/v1/ai',                 aiRouter);
 
 // ── Global error handler — must be registered LAST ──
 app.use(globalErrorHandler);
