@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle, XCircle, AlertTriangle, ArrowLeft,
   MapPin, ShieldCheck, FileText, User,
-  ExternalLink, Edit2, Save, X, Loader
+  ExternalLink, Edit2, Save, X, Loader, Sparkles
 } from 'lucide-react';
 import { api } from '../../utils/api';
 import useToastStore from '../../store/toastStore';
@@ -47,6 +47,24 @@ export default function AdminApplicationReview() {
   const [editing,     setEditing]     = useState(false);
   const [editData,    setEditData]    = useState({});
   const [savingEdit,  setSavingEdit]  = useState(false);
+
+  // ── AI Verify State ────────────────────────────────────────────────────────
+  const [aiVerify,      setAiVerify]      = useState(null);
+  const [aiVerifying,   setAiVerifying]   = useState(false);
+  const [aiVerifyError, setAiVerifyError] = useState(null);
+
+  const handleAiVerify = async () => {
+    setAiVerifying(true);
+    setAiVerifyError(null);
+    try {
+      const res = await api.post(`/admin/applications/${id}/ai-verify`, {});
+      setAiVerify(res.data);
+    } catch (err) {
+      setAiVerifyError(err.message || 'AI verification failed. Please try again.');
+    } finally {
+      setAiVerifying(false);
+    }
+  };
 
   const fetchApp = useCallback(async () => {
     setLoading(true);
@@ -294,6 +312,93 @@ export default function AdminApplicationReview() {
               <p style={{ fontSize:13, color:'var(--ink-400)', textAlign:'center', padding:'var(--sp-4)' }}>No documents uploaded yet.</p>
             )}
           </div>
+
+          {/* ── AI Document Verification ── */}
+          <div style={{ background:'var(--white)', border:'1.5px solid var(--green-200)', borderRadius:16, padding:'var(--sp-5)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'var(--sp-3)', marginBottom:'var(--sp-4)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <Sparkles size={16} strokeWidth={2} style={{ color:'var(--green-700)' }} />
+                <span style={{ fontSize:14, fontWeight:700, color:'var(--ink-900)' }}>AI Document Verification</span>
+                <span style={{ fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:9999, background:'var(--green-700)', color:'#FFF' }}>Gemini Vision</span>
+              </div>
+              <button
+                id="ai-verify-btn"
+                onClick={handleAiVerify}
+                disabled={aiVerifying}
+                style={{
+                  display:'flex', alignItems:'center', gap:6, padding:'8px 16px',
+                  background: aiVerifying ? 'var(--ink-100)' : 'linear-gradient(135deg,#0C6B4E,#1a56db)',
+                  color: aiVerifying ? 'var(--ink-400)' : '#FFF',
+                  border:'none', borderRadius:10, fontSize:13, fontWeight:700,
+                  cursor: aiVerifying ? 'not-allowed' : 'pointer',
+                  fontFamily:'var(--font-body)', transition:'all 0.2s',
+                  boxShadow: aiVerifying ? 'none' : '0 2px 8px rgba(12,107,78,0.2)',
+                }}>
+                {aiVerifying
+                  ? <><Loader size={13} strokeWidth={2.5} style={{ animation:'spin 0.8s linear infinite' }} /> Verifying…</>
+                  : <><Sparkles size={13} strokeWidth={2.5} /> Verify with AI</>}
+              </button>
+            </div>
+            <p style={{ fontSize:12, color:'var(--ink-500)', marginBottom:'var(--sp-3)', lineHeight:1.5 }}>
+              AI reads the uploaded Drug License and GST Certificate images and cross-checks the extracted numbers against what the pharmacy owner submitted.
+            </p>
+
+            <AnimatePresence>
+              {(aiVerify || aiVerifyError) && (
+                <motion.div initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}>
+                  {aiVerifyError ? (
+                    <div style={{ fontSize:13, color:'var(--danger)', background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:10, padding:'var(--sp-3) var(--sp-4)' }}>{aiVerifyError}</div>
+                  ) : (
+                    <>
+                      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                        <thead>
+                          <tr style={{ background:'var(--ink-50)' }}>
+                            {['Field','Submitted','AI Extracted','Match'].map(h => (
+                              <th key={h} style={{ padding:'8px 12px', textAlign:'left', fontWeight:700, color:'var(--ink-500)', fontSize:11, textTransform:'uppercase', letterSpacing:'0.05em', border:'1px solid var(--ink-100)' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[{
+                            field: 'Drug License',
+                            submitted: aiVerify.submittedDrugLicense || '—',
+                            extracted: aiVerify.drugLicenseExtracted || '—',
+                            match: aiVerify.licenseMatch,
+                          },{
+                            field: 'GSTIN',
+                            submitted: aiVerify.submittedGstin || '—',
+                            extracted: aiVerify.gstinExtracted || '—',
+                            match: aiVerify.gstMatch,
+                          }].map(row => (
+                            <tr key={row.field} style={{ borderBottom:'1px solid var(--ink-100)' }}>
+                              <td style={{ padding:'10px 12px', fontWeight:600, color:'var(--ink-700)', border:'1px solid var(--ink-100)' }}>{row.field}</td>
+                              <td style={{ padding:'10px 12px', fontFamily:'monospace', fontSize:12, color:'var(--ink-600)', border:'1px solid var(--ink-100)' }}>{row.submitted}</td>
+                              <td style={{ padding:'10px 12px', fontFamily:'monospace', fontSize:12, color:'var(--ink-800)', fontWeight:600, border:'1px solid var(--ink-100)' }}>{row.extracted}</td>
+                              <td style={{ padding:'10px 12px', border:'1px solid var(--ink-100)' }}>
+                                {row.match === 'match' && <span style={{ color:'var(--success-dark)', fontWeight:700, display:'flex', alignItems:'center', gap:4 }}><CheckCircle size={14} strokeWidth={2.5}/> Match</span>}
+                                {row.match === 'mismatch' && <span style={{ color:'var(--danger)', fontWeight:700, display:'flex', alignItems:'center', gap:4 }}><XCircle size={14} strokeWidth={2.5}/> Mismatch</span>}
+                                {row.match === 'unreadable' && <span style={{ color:'var(--ink-400)', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}><AlertTriangle size={13} strokeWidth={2}/> Unreadable</span>}
+                                {row.match === 'not_provided' && <span style={{ color:'var(--ink-300)', fontSize:12 }}>—</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div style={{ marginTop:'var(--sp-3)', display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontSize:12, fontWeight:600, color:'var(--ink-500)' }}>Overall confidence:</span>
+                        <span style={{
+                          fontSize:12, fontWeight:700, padding:'2px 10px', borderRadius:9999,
+                          background: aiVerify.overallConfidence==='high' ? 'var(--success-light)' : aiVerify.overallConfidence==='low' ? 'var(--danger-light)' : 'var(--warning-light)',
+                          color: aiVerify.overallConfidence==='high' ? 'var(--success-dark)' : aiVerify.overallConfidence==='low' ? 'var(--danger)' : 'var(--warning-dark)',
+                        }}>{aiVerify.overallConfidence?.toUpperCase()}</span>
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
 
         {/* Right — actions */}

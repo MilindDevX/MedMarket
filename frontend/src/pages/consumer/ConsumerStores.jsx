@@ -2,7 +2,7 @@ import usePageTitle from '../../utils/usePageTitle';
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MapPin, ShieldCheck, Star, LocateFixed, Loader, Search, X } from 'lucide-react';
+import { MapPin, ShieldCheck, Star, LocateFixed, Loader, Search, X, Navigation } from 'lucide-react';
 import { useStores } from '../../hooks/useStores';
 import useLocationStore from '../../store/locationStore';
 import styles from './ConsumerStores.module.css';
@@ -16,14 +16,19 @@ export default function ConsumerStores() {
   const medicineFilter = searchParams.get('medicine') || '';
   const stateMessage   = location.state?.message || '';
 
-  // Read from the shared locationStore — same source as home tab and navbar
-  const { city: storeCity, detecting, error: locationError, setCity, detectLocation, clear } = useLocationStore();
+  const { city: storeCity, lat, lng, detecting, error: locationError, setCity, detectLocation, clear } = useLocationStore();
 
   // Local input mirrors the store city; changes only commit on form submit
   const [cityInput, setCityInput] = useState(storeCity);
   useEffect(() => { setCityInput(storeCity); }, [storeCity]);
 
-  const { stores, loading, error } = useStores(storeCity);
+  // Geo mode: use lat/lng when available, else fall back to city string
+  const isGeoMode = lat != null && lng != null;
+  const { stores, loading, error } = useStores(
+    isGeoMode
+      ? { lat, lng, radius: 20 }
+      : { city: storeCity }
+  );
 
   const applyCity = (e) => {
     e.preventDefault();
@@ -40,12 +45,14 @@ export default function ConsumerStores() {
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>
-          {storeCity ? `Pharmacies in ${storeCity}` : 'Stores near you'}
+          {isGeoMode ? 'Stores near you' : storeCity ? `Pharmacies in ${storeCity}` : 'Stores near you'}
         </h1>
         <p className={styles.subtitle}>
-          {storeCity
+          {isGeoMode
+            ? `${stores.length} verified pharmacy${stores.length !== 1 ? 's' : ''} within 20 km`
+            : storeCity
             ? `${stores.length} verified pharmacy${stores.length !== 1 ? 's' : ''} found`
-            : 'Enter your city to find verified pharmacies near you'}
+            : 'Enter your city or use GPS to find verified pharmacies'}
         </p>
       </div>
 
@@ -74,16 +81,23 @@ export default function ConsumerStores() {
         </form>
 
         <button onClick={detectLocation} disabled={detecting}
-          style={{ height:42, padding:'0 16px', background:'var(--white)', color:'var(--green-700)', border:'1.5px solid var(--green-200)', borderRadius:'var(--r-md)', fontSize:13, fontWeight:700, cursor: detecting ? 'not-allowed' : 'pointer', fontFamily:'var(--font-body)', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:6, opacity: detecting ? 0.7 : 1, flexShrink:0 }}>
+          style={{ height:42, padding:'0 16px', background: isGeoMode ? 'var(--green-700)' : 'var(--white)', color: isGeoMode ? '#FFF' : 'var(--green-700)', border:'1.5px solid var(--green-200)', borderRadius:'var(--r-md)', fontSize:13, fontWeight:700, cursor: detecting ? 'not-allowed' : 'pointer', fontFamily:'var(--font-body)', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:6, opacity: detecting ? 0.7 : 1, flexShrink:0 }}>
           {detecting
             ? <><Loader size={13} strokeWidth={2.5} style={{ animation:'spin 0.8s linear infinite' }} /> Detecting…</>
-            : <><LocateFixed size={13} strokeWidth={2.5} /> Use my location</>}
+            : <><LocateFixed size={13} strokeWidth={2.5} /> {isGeoMode ? 'GPS active' : 'Use my location'}</>}
         </button>
       </div>
 
       {locationError && (
         <div style={{ background:'var(--warning-light)', border:'1px solid #FDE68A', borderRadius:8, padding:'8px 14px', fontSize:13, color:'var(--warning-dark)', marginBottom:'var(--sp-3)' }}>
           {locationError}
+        </div>
+      )}
+
+      {isGeoMode && (
+        <div style={{ background:'var(--green-50)', border:'1px solid var(--green-200)', borderRadius:8, padding:'8px 14px', fontSize:13, color:'var(--green-700)', marginBottom:'var(--sp-3)', display:'flex', alignItems:'center', gap:6 }}>
+          <Navigation size={13} strokeWidth={2.5} />
+          Showing stores sorted by distance from your GPS location (within 20 km)
         </div>
       )}
 
@@ -110,7 +124,7 @@ export default function ConsumerStores() {
 
       {!loading && !error && (
         <>
-          {!storeCity ? (
+          {!storeCity && !isGeoMode ? (
             <div style={{ textAlign:'center', padding:'var(--sp-10)', color:'var(--ink-400)', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16 }}>
               <MapPin size={36} strokeWidth={1} style={{ margin:'0 auto var(--sp-3)', display:'block' }} />
               <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>Enter your city or tap "Use my location"</p>
@@ -119,14 +133,19 @@ export default function ConsumerStores() {
           ) : stores.length === 0 ? (
             <div style={{ textAlign:'center', padding:'var(--sp-10)', color:'var(--ink-400)', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16 }}>
               <MapPin size={36} strokeWidth={1} style={{ margin:'0 auto var(--sp-3)', display:'block' }} />
-              <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>No stores found in {storeCity}</p>
-              <p style={{ fontSize:13 }}>Try a nearby city or check your spelling.</p>
+              <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>
+                {isGeoMode ? 'No stores found within 20 km' : `No stores found in ${storeCity}`}
+              </p>
+              <p style={{ fontSize:13 }}>
+                {isGeoMode ? 'Try searching by city name instead.' : 'Try a nearby city or check your spelling.'}
+              </p>
             </div>
           ) : (
             <>
               <div className={styles.sectionTitle}>
                 <ShieldCheck size={18} strokeWidth={1.8} style={{ color:'var(--green-700)' }} />
-                {stores.length} verified {stores.length === 1 ? 'pharmacy' : 'pharmacies'} in {storeCity}
+                {stores.length} verified {stores.length === 1 ? 'pharmacy' : 'pharmacies'}
+                {isGeoMode ? ' near your location' : ` in ${storeCity}`}
               </div>
 
               <div className={styles.grid}>
@@ -151,7 +170,13 @@ export default function ConsumerStores() {
                         <Star size={11} strokeWidth={2} style={{ color:'#F59E0B', fill:'#F59E0B' }} />
                         {Number(store.avg_rating || 0).toFixed(1)} ({store.total_reviews || 0})
                       </span>
-                      <span className={styles.distanceChip}>📍 {store.city}</span>
+                      {isGeoMode && store.distance_km != null ? (
+                        <span className={styles.distanceChip} style={{ color:'var(--green-700)', fontWeight:700 }}>
+                          <Navigation size={10} strokeWidth={2.5} /> {store.distance_km} km
+                        </span>
+                      ) : (
+                        <span className={styles.distanceChip}>📍 {store.city}</span>
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -165,3 +190,4 @@ export default function ConsumerStores() {
     </div>
   );
 }
+

@@ -1,8 +1,9 @@
 import usePageTitle from '../../utils/usePageTitle';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { SkeletonCard } from '../../components/ui/Skeleton';
-import { motion } from 'framer-motion';
-import { TrendingUp, BarChart2, Package, ShoppingBag, Users, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { TrendingUp, BarChart2, Package, ShoppingBag, Users, Clock, AlertTriangle, CheckCircle, Lightbulb, Sparkles, Loader, X } from 'lucide-react';
+import { api } from '../../utils/api';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend,
@@ -33,6 +34,24 @@ export default function PharmacyAnalytics() {
   const { orders,    loading: ordersLoading } = usePharmacyOrders();
   const { inventory, loading: invLoading }    = useInventory();
   const loading = ordersLoading || invLoading;
+
+  // ── AI Insights State ──────────────────────────────────────────────────────
+  const [aiInsights,   setAiInsights]   = useState(null);
+  const [aiLoading,    setAiLoading]    = useState(false);
+  const [aiError,      setAiError]      = useState(null);
+
+  const generateInsights = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await api.get('/ai/pharmacy/ai-insights');
+      setAiInsights(res.data);
+    } catch (err) {
+      setAiError(err.message || 'Failed to generate insights. Try again.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const metrics = useMemo(() => {
     const delivered  = orders.filter(o => o.status === 'delivered');
@@ -152,10 +171,71 @@ export default function PharmacyAnalytics() {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-5)' }}>
-      <div>
-        <h1 style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:600, color:'var(--ink-900)', letterSpacing:'-0.3px' }}>Analytics</h1>
-        <p style={{ fontSize:13, color:'var(--ink-500)', marginTop:4 }}>Based on your real order and inventory data.</p>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'var(--sp-3)' }}>
+        <div>
+          <h1 style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:600, color:'var(--ink-900)', letterSpacing:'-0.3px' }}>Analytics</h1>
+          <p style={{ fontSize:13, color:'var(--ink-500)', marginTop:4 }}>Based on your real order and inventory data.</p>
+        </div>
+        <button
+          id="ai-insights-btn"
+          onClick={generateInsights}
+          disabled={aiLoading || loading}
+          style={{
+            display:'flex', alignItems:'center', gap:8, padding:'10px 20px',
+            background: aiLoading ? 'var(--ink-100)' : 'linear-gradient(135deg,#0C6B4E,#1a56db)',
+            color: aiLoading ? 'var(--ink-400)' : '#FFF',
+            border:'none', borderRadius:12, fontSize:14, fontWeight:700,
+            cursor: aiLoading || loading ? 'not-allowed' : 'pointer',
+            fontFamily:'var(--font-body)', boxShadow: aiLoading ? 'none' : '0 2px 12px rgba(12,107,78,0.25)',
+            transition:'all 0.2s',
+          }}>
+          {aiLoading
+            ? <><Loader size={15} strokeWidth={2.5} style={{ animation:'spin 0.8s linear infinite' }} /> Generating…</>
+            : <><Sparkles size={15} strokeWidth={2.5} /> ✨ Generate AI Insights</>}
+        </button>
       </div>
+
+      {/* ── AI Insights Panel ────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {(aiInsights?.insights?.length > 0 || aiError) && (
+          <motion.div
+            initial={{ opacity:0, y:-12 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-12 }}
+            style={{ background:'linear-gradient(135deg,#F0FDF4,#EFF6FF)', border:'1.5px solid var(--green-200)', borderRadius:16, padding:'var(--sp-5)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'var(--sp-4)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <Sparkles size={18} strokeWidth={2} style={{ color:'var(--green-700)' }} />
+                <span style={{ fontSize:16, fontWeight:700, color:'var(--ink-900)' }}>AI Business Insights</span>
+                <span style={{ fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:9999, background:'var(--green-700)', color:'#FFF' }}>Powered by Gemini</span>
+              </div>
+              <button onClick={() => { setAiInsights(null); setAiError(null); }}
+                style={{ background:'none', border:'none', cursor:'pointer', color:'var(--ink-400)', display:'flex', padding:4 }}>
+                <X size={16} strokeWidth={2.5} />
+              </button>
+            </div>
+            {aiError ? (
+              <div style={{ fontSize:13, color:'var(--danger)', background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:10, padding:'var(--sp-3) var(--sp-4)' }}>{aiError}</div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-3)' }}>
+                {aiInsights.insights.map((insight, i) => (
+                  <motion.div key={i}
+                    initial={{ opacity:0, x:-10 }} animate={{ opacity:1, x:0 }} transition={{ delay: i * 0.1 }}
+                    style={{ display:'flex', alignItems:'flex-start', gap:'var(--sp-3)', padding:'var(--sp-3) var(--sp-4)', background:'var(--white)', borderRadius:12, border:'1px solid var(--ink-100)', boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
+                    <div style={{ width:28, height:28, borderRadius:8, background:'var(--green-50)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <Lightbulb size={14} strokeWidth={2} style={{ color:'var(--green-700)' }} />
+                    </div>
+                    <p style={{ fontSize:14, color:'var(--ink-800)', lineHeight:1.6, margin:0, fontWeight:500 }}>{insight}</p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+            {aiInsights?.generatedAt && (
+              <p style={{ fontSize:11, color:'var(--ink-400)', marginTop:'var(--sp-3)', textAlign:'right' }}>
+                Generated {new Date(aiInsights.generatedAt).toLocaleString('en-IN')}
+              </p>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── KPI Row ── */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(155px,1fr))', gap:'var(--sp-4)' }}>
@@ -340,6 +420,7 @@ export default function PharmacyAnalytics() {
           </div>
         </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
