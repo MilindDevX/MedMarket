@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, ArrowRight, CheckCircle, ShieldCheck, MapPin } from 'lucide-react';
+import PasswordStrengthMeter from '../../components/ui/PasswordStrengthMeter';
 import useAuthStore from '../../store/authStore';
 import GoogleSignInButton from '../../components/ui/GoogleSignInButton';
 import styles from './ConsumerSignup.module.css';
@@ -216,6 +217,7 @@ export default function ConsumerSignup() {
                     value={form.password} onChange={v => setField('password', v)}
                     placeholder="Min. 8 chars, 1 uppercase, 1 number" error={errors.password}
                     suffix={eyeBtn(showPassword, () => setShowPassword(s => !s))} />
+                  <PasswordStrengthMeter password={form.password} />
                   <Field id="confirm" label="Confirm password"
                     type={showConfirm ? 'text' : 'password'}
                     value={form.confirm} onChange={v => setField('confirm', v)}

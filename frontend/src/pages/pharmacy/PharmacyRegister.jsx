@@ -3,6 +3,7 @@ import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Upload, ArrowRight, ArrowLeft, Store, FileText, UserPlus, Eye, EyeOff, Loader, MapPin } from 'lucide-react';
+import PasswordStrengthMeter from '../../components/ui/PasswordStrengthMeter';
 import useAuthStore from '../../store/authStore';
 import useToastStore from '../../store/toastStore';
 import { api, getTokens } from '../../utils/api';
@@ -310,6 +311,7 @@ export default function PharmacyRegister() {
                         {showPw ? <EyeOff size={16}/> : <Eye size={16}/>}
                       </button>
                     </div>
+                    <PasswordStrengthMeter password={data.accountPassword} />
                   </div>
                   <div className={styles.field}>
                     <label className={styles.label}>Confirm Password *</label>
