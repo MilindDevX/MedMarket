@@ -2,7 +2,7 @@ import usePageTitle from '../../utils/usePageTitle';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Store, Shield, ArrowRight, Eye, EyeOff, Phone, Mail } from 'lucide-react';
+import { User, Store, Shield, ArrowRight, Eye, EyeOff, Phone, Mail, CheckCircle2 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import GoogleSignInButton from '../../components/ui/GoogleSignInButton';
 import styles from './Login.module.css';
@@ -125,10 +125,15 @@ export default function Login() {
             {roles.map(({ id, icon:Icon, label, sub, color }) => (
               <motion.button key={id}
                 className={`${styles.roleCard} ${selectedRole === id ? styles.roleCardActive : ''}`}
-                style={selectedRole === id ? { borderColor:color, background:`${color}08` } : {}}
+                style={selectedRole === id ? { borderColor:color, background:`${color}12` } : {}}
                 onClick={() => handleRoleSelect(id)}
-                whileHover={{ scale:1.02 }} whileTap={{ scale:0.98 }} type="button">
-                <div className={styles.roleIcon} style={{ background:selectedRole===id ? `${color}15` : 'var(--ink-100)', color }}>
+                whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }} type="button">
+                {selectedRole === id && (
+                  <div style={{ position:'absolute', top:8, right:8, color }}>
+                    <CheckCircle2 size={14} strokeWidth={2.5} />
+                  </div>
+                )}
+                <div className={styles.roleIcon} style={{ background:selectedRole===id ? `${color}18` : 'var(--ink-100)', color }}>
                   <Icon size={18} strokeWidth={1.8} />
                 </div>
                 <div className={styles.roleLabel}>{label}</div>
