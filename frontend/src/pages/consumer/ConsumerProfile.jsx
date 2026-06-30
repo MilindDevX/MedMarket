@@ -209,9 +209,18 @@ export default function ConsumerProfile() {
             </div>
           ))}
           {!addrLoading && addresses.length === 0 && (
-            <div style={{ textAlign:'center', padding:'var(--sp-6)', color:'var(--ink-400)', fontSize:14 }}>
-              No addresses saved yet.
-            </div>
+            <motion.div initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }}
+              style={{ textAlign:'center', padding:'var(--sp-8)', border:'2px dashed var(--ink-200)', borderRadius:16, margin:'var(--sp-2)' }}>
+              <div style={{ width:52, height:52, borderRadius:'50%', background:'var(--ink-50)', border:'1.5px solid var(--ink-200)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto var(--sp-3)' }}>
+                <MapPin size={22} strokeWidth={1.5} style={{ color:'var(--ink-400)' }} />
+              </div>
+              <p style={{ fontSize:14, fontWeight:600, color:'var(--ink-700)', marginBottom:4 }}>No saved addresses</p>
+              <p style={{ fontSize:13, color:'var(--ink-400)', marginBottom:'var(--sp-4)' }}>Add an address to speed up checkout on future orders.</p>
+              <button onClick={openAddAddress}
+                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'9px 20px', background:'var(--green-700)', color:'var(--white)', border:'none', borderRadius:'var(--r-md)', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)' }}>
+                <Plus size={14} strokeWidth={2.5} /> Add Address
+              </button>
+            </motion.div>
           )}
         </div>
       </motion.div>

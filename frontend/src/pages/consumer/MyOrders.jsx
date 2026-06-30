@@ -79,16 +79,29 @@ export default function MyOrders() {
       )}
 
       {!loading && !error && filtered.length === 0 && (
-        <div style={{ textAlign:'center', padding:'var(--sp-12)', color:'var(--ink-400)' }}>
-          <Package size={40} strokeWidth={1} style={{ margin:'0 auto var(--sp-3)' }} />
-          <p style={{ fontSize:15 }}>No {tab} orders</p>
+        <motion.div
+          initial={{ opacity:0, scale:0.97 }} animate={{ opacity:1, scale:1 }}
+          style={{ background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:20, padding:'var(--sp-10)', textAlign:'center', boxShadow:'var(--shadow-sm)' }}>
+          <div style={{ width:72, height:72, borderRadius:'50%', background:'var(--ink-50)', border:'2px solid var(--ink-200)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto var(--sp-4)' }}>
+            <Package size={32} strokeWidth={1.4} style={{ color:'var(--ink-400)' }} />
+          </div>
+          <h3 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:600, color:'var(--ink-900)', letterSpacing:'-0.3px', marginBottom:'var(--sp-2)' }}>
+            {tab === 'active' ? 'No active orders' : 'No past orders'}
+          </h3>
+          <p style={{ fontSize:14, color:'var(--ink-500)', lineHeight:1.65, marginBottom:'var(--sp-5)', maxWidth:300, margin:'0 auto var(--sp-5)' }}>
+            {tab === 'active'
+              ? 'You have no orders in progress. Browse medicines from verified stores near you.'
+              : 'Your completed and cancelled orders will appear here.'}
+          </p>
           {tab === 'active' && (
             <button onClick={() => navigate('/consumer/medicines')}
-              style={{ marginTop:'var(--sp-4)', padding:'10px 24px', background:'var(--green-700)', color:'var(--white)', border:'none', borderRadius:'var(--r-md)', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)' }}>
+              style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'11px 26px', background:'var(--green-700)', color:'var(--white)', border:'none', borderRadius:'var(--r-md)', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)', transition:'all 0.2s' }}
+              onMouseEnter={e => { e.currentTarget.style.background='var(--green-600)'; e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 18px rgba(12,107,78,0.3)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background='var(--green-700)'; e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
               Browse Medicines
             </button>
           )}
-        </div>
+        </motion.div>
       )}
 
       {!loading && !error && filtered.length > 0 && (

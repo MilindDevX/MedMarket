@@ -138,8 +138,9 @@
   box-shadow: var(--shadow-md);
 }
 .emptyIcon {
-  width: 72px; height: 72px; border-radius: var(--r-full);
-  background: var(--ink-100); color: var(--ink-400);
+  width: 80px; height: 80px; border-radius: var(--r-full);
+  background: var(--green-50); color: var(--green-700);
+  border: 2px solid var(--green-200);
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto var(--sp-5);
 }
@@ -149,10 +150,12 @@
   display: inline-flex; align-items: center; gap: 7px;
   background: var(--green-700); color: var(--white);
   border: none; border-radius: var(--r-md);
-  padding: 12px 24px; font-size: 15px; font-weight: 700; cursor: pointer;
-  transition: background var(--duration);
+  padding: 12px 28px; font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: background var(--duration), transform var(--duration), box-shadow var(--duration);
+  font-family: var(--font-body);
 }
-.browseBtn:hover { background: var(--green-600); }
+.browseBtn:hover { background: var(--green-600); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(12,107,78,0.3); }
+.browseBtn:active { transform: translateY(0); }
 
 @media (max-width: 768px) {
   .layout { grid-template-columns: 1fr; }

@@ -138,7 +138,14 @@ export default function OrderTracking() {
               return (
                 <div key={key} style={{ display:'flex', gap:'var(--sp-4)', alignItems:'flex-start', paddingBottom: i < stages.length-1 ? 'var(--sp-5)' : 0, position:'relative' }}>
                   {i < stages.length-1 && (
-                    <div style={{ position:'absolute', left:17, top:36, bottom:0, width:2, background: done ? 'var(--green-700)' : 'var(--ink-200)', transition:'background 0.3s' }} />
+                    <div style={{ position:'absolute', left:17, top:36, bottom:0, width:2, background:'var(--ink-200)', overflow:'hidden' }}>
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: done ? '100%' : '0%' }}
+                        transition={{ duration: 0.5, delay: i * 0.1, ease: 'easeOut' }}
+                        style={{ width:'100%', background:'var(--green-700)', borderRadius:2 }}
+                      />
+                    </div>
                   )}
                   <div style={{ width:36, height:36, borderRadius:'50%', background: done ? 'var(--green-700)' : active ? 'var(--green-50)' : 'var(--ink-100)', border: active ? '2px solid var(--green-700)' : 'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, zIndex:1, transition:'all 0.3s' }}>
                     <Icon size={18} strokeWidth={2} style={{ color: done ? '#FFFFFF' : active ? 'var(--green-700)' : 'var(--ink-400)' }} />

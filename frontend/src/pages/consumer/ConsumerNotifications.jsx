@@ -56,11 +56,19 @@ export default function ConsumerNotifications() {
       </div>
 
       {notifications.length === 0 && (
-        <div style={{ textAlign:'center', padding:'var(--sp-12)', color:'var(--ink-400)', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16 }}>
-          <Bell size={40} strokeWidth={1} style={{ margin:'0 auto var(--sp-3)', display:'block' }} />
-          <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>No notifications yet</p>
-          <p style={{ fontSize:13 }}>Order status updates will appear here automatically.</p>
-        </div>
+        <motion.div
+          initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
+          style={{ background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:20, padding:'var(--sp-12)', textAlign:'center', boxShadow:'var(--shadow-sm)' }}>
+          <div style={{ width:72, height:72, borderRadius:'50%', background:'var(--ink-50)', border:'2px solid var(--ink-200)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto var(--sp-4)' }}>
+            <Bell size={30} strokeWidth={1.4} style={{ color:'var(--ink-400)' }} />
+          </div>
+          <h3 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:600, color:'var(--ink-900)', letterSpacing:'-0.3px', marginBottom:'var(--sp-2)' }}>
+            You're all caught up!
+          </h3>
+          <p style={{ fontSize:14, color:'var(--ink-500)', lineHeight:1.65, maxWidth:280, margin:'0 auto' }}>
+            Order updates, pharmacy messages, and alerts will appear here automatically.
+          </p>
+        </motion.div>
       )}
 
       <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-2)' }}>
