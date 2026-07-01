@@ -79,7 +79,7 @@ export default function PharmacySuspended() {
           </div>
 
           {/* Contact */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', marginBottom: 'var(--sp-5)' }}>
             <div className={styles.contact}>
               <Phone size={14} strokeWidth={2} />
               <span>Pharmacy Support: <strong>1800-MED-CARE</strong> (9am–6pm, Mon–Sat)</span>
@@ -89,6 +89,25 @@ export default function PharmacySuspended() {
               <span>Email: <strong>pharmacy-support@medmarket.in</strong></span>
             </div>
           </div>
+
+          {/* CTA */}
+          <a
+            href="mailto:pharmacy-support@medmarket.in?subject=Suspension+Review+Request"
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              width: '100%', padding: '13px 0',
+              background: 'var(--danger)', color: '#FFFFFF',
+              border: 'none', borderRadius: 'var(--r-md)',
+              fontSize: 15, fontWeight: 700, cursor: 'pointer',
+              textDecoration: 'none', fontFamily: 'var(--font-body)',
+              transition: 'background 0.2s, transform 0.2s, box-shadow 0.2s',
+              boxShadow: '0 4px 14px rgba(239,68,68,0.3)',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background='#DC2626'; e.currentTarget.style.transform='translateY(-2px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background='var(--danger)'; e.currentTarget.style.transform=''; }}
+          >
+            <Mail size={16} strokeWidth={2} /> Contact Support to Resolve
+          </a>
         </motion.div>
       </div>
     </div>

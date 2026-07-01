@@ -195,6 +195,22 @@ export default function PharmacyAnalytics() {
         </button>
       </div>
 
+      {/* AI skeleton loader while generating */}
+      <AnimatePresence>
+        {aiLoading && (
+          <motion.div
+            key="ai-skeleton"
+            initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }}
+            style={{ background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:16, padding:'var(--sp-5)', marginBottom:'var(--sp-4)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:'var(--sp-4)' }}>
+              <Sparkles size={16} style={{ color:'var(--green-700)' }} strokeWidth={2} />
+              <span style={{ fontSize:14, fontWeight:600, color:'var(--ink-700)' }}>Analysing market trends…</span>
+            </div>
+            <SkeletonCard lines={4} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── AI Insights Panel ────────────────────────────────────────────── */}
       <AnimatePresence>
         {(aiInsights?.insights?.length > 0 || aiError) && (

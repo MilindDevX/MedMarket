@@ -84,6 +84,9 @@
 .navItemActive {
   background: rgba(12,107,78,0.25);
   color: var(--green-300);
+  box-shadow: inset 3px 0 0 var(--green-500), 0 0 12px rgba(12,107,78,0.12);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  font-weight: 700;
 }
 
 /* Indented child items (e.g. Expiry Alerts under Inventory) */
