@@ -53,9 +53,18 @@
   font-size: 12px; font-weight: 700; color: var(--ink-900);
   background: var(--ink-100); border: 1px solid var(--ink-200);
   padding: 5px 12px; border-radius: var(--r-sm); text-decoration: none;
-  transition: all var(--duration); white-space: nowrap;
+  transition: all var(--duration); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;
 }
-.reviewBtn:hover { background: var(--always-dark); color: var(--white); }
+.reviewBtn:hover { background: var(--always-dark); color: var(--white); transform: translateY(-1px); }
+
+.reviewBtnPrimary {
+  font-size: 12px; font-weight: 700; color: var(--white);
+  background: var(--green-700); border: none;
+  padding: 6px 14px; border-radius: var(--r-sm); text-decoration: none;
+  transition: all var(--duration); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;
+  box-shadow: 0 2px 8px rgba(12,107,78,0.25);
+}
+.reviewBtnPrimary:hover { background: var(--green-600); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(12,107,78,0.35); }
 
 .suspendBtn {
   display: inline-flex; align-items: center; gap: 4px;
@@ -65,16 +74,16 @@
   cursor: pointer; font-family: var(--font-body); white-space: nowrap;
   transition: all var(--duration);
 }
-.suspendBtn:hover { background: var(--warning-dark); color: var(--white); }
+.suspendBtn:hover { background: var(--warning-dark); color: var(--white); transform: translateY(-1px); }
 
 .reinstateBtn {
   font-size: 11px; font-weight: 700;
   color: var(--success-dark); background: var(--success-light);
   border: 1px solid #6EE7B7; padding: 4px 10px; border-radius: var(--r-sm);
   cursor: pointer; font-family: var(--font-body); white-space: nowrap;
-  transition: all var(--duration);
+  transition: all var(--duration); display: inline-flex; align-items: center; gap: 4px;
 }
-.reinstateBtn:hover { background: var(--success-dark); color: var(--white); }
+.reinstateBtn:hover { background: var(--success-dark); color: var(--white); transform: translateY(-1px); }
 
 .empty { padding: var(--sp-10); text-align: center; color: var(--ink-400); font-size: 14px; }
 

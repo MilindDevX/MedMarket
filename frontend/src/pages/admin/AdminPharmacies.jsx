@@ -2,7 +2,7 @@ import usePageTitle from '../../utils/usePageTitle';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Search, ShieldOff } from 'lucide-react';
+import { Search, Eye } from 'lucide-react';
 import { useAdminPharmacies } from '../../hooks/useAdminPharmacies';
 import Badge from '../../components/ui/Badge';
 import { SkeletonTable } from '../../components/ui/Skeleton';
@@ -111,8 +111,11 @@ export default function AdminPharmacies() {
                 </td>
                 <td className={styles.td}>
                   <div className={styles.actions}>
-                    <Link to={`/admin/pharmacies/${app.id}`} className={styles.reviewBtn}>
-                      {app.status==='pending' ? 'Review' : 'View'}
+                    <Link
+                      to={`/admin/pharmacies/${app.id}`}
+                      className={app.status === 'pending' ? styles.reviewBtnPrimary : styles.reviewBtn}>
+                      <Eye size={12} strokeWidth={2.5} />
+                      {app.status === 'pending' ? 'Review' : 'View'}
                     </Link>
                     {app.status==='pending' && (
                       <>

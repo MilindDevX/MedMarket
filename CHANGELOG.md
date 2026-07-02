@@ -21,6 +21,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.2.0] — 2026-07-04
+
+### Added
+- **PasswordStrengthMeter component** (`components/ui/PasswordStrengthMeter.jsx` + `.module.css`)
+  - Live password strength evaluation: length, uppercase, number, special-char rules
+  - Colour-coded progress bar + label (Weak / Fair / Strong / Very Strong)
+  - Wired into `ConsumerSignup.jsx` and `PharmacyRegister.jsx`
+
+### Changed
+
+**Auth & Onboarding**
+- `Login.jsx` / `Login.module.css` — role selection cards now show a filled background + `CheckCircle2` badge on the active card; smooth scale + shadow transitions replace the previous thin-border indicator
+
+**Consumer Flow**
+- `ConsumerHome.module.css` — category pills: hover scale + box-shadow micro-animation; active press state
+- `ConsumerStores.module.css` — store avatar: gradient circle with uppercase initials, font-weight 800, text-shadow, box-shadow
+- `Cart.module.css` — empty state: branded icon circle, animated "Browse Medicines" CTA
+- `MyOrders.jsx` — empty state: styled card with icon circle, headings, and animated "Start Shopping" CTA
+- `ConsumerNotifications.jsx` — empty state: styled card with animated entrance and "You're all caught up" message
+- `ConsumerProfile.jsx` — addresses empty state: dashed border card with "Add Address" CTA
+- `OrderTracking.jsx` — stepper connector lines: animated height fill via `motion.div` transition driven by order step index
+- `Landing.module.css` — hero CTA buttons: `translateY` hover lift + layered box-shadow depth
+
+**Pharmacy Flow**
+- `PharmacyLayout.module.css` — active sidebar item: left green inset accent border + font-weight 700
+- `PharmacyAnalytics.jsx` — AI Insights loading state: replaced static spinner with `SkeletonCard` + "Analysing market trends…" animated label
+- `PharmacySuspended.jsx` — added "Contact Support to Resolve" `mailto:support@medmarket.in` CTA button + next-steps note
+
+**Admin Flow**
+- `AdminLayout.module.css` — active sidebar item: left white inset accent border + font-weight 700
+- `AdminPharmacies.module.css` — new `.reviewBtnPrimary` class (solid green, larger padding) for pending applications; lift transforms on all action buttons
+- `AdminPharmacies.jsx` — pending pharmacy rows now use `reviewBtnPrimary` with `Eye` icon
+
+### Removed
+- `backend/test-models.ts`, `backend/test-models2.ts`, `backend/test-new-features.ts` — scratch Gemini/Prisma exploration scripts deleted from version control
+- `.DS_Store` at project root
+
+### Fixed
+- `backend/.gitignore` — added `test-*.ts`, `scratch-*.ts`, `debug-*.ts` patterns to prevent future scratch scripts from being committed
+- `PharmacyStoreProfile.module.css` — placeholder file added to version control (component uses inline styles; file tracks the existence of the module)
+
+
+
 ## [1.1.0] — 2026-06-26
 
 ### Added
