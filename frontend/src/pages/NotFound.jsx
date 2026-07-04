@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import usePageTitle from '../utils/usePageTitle';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Home } from 'lucide-react';
@@ -17,6 +17,33 @@ export default function NotFound() {
   };
 
   return (
+    <div style={{ position: 'relative' }}>
+      {/* Minimal brand nav — keeps users oriented */}
+      <nav style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+        padding: '0 var(--sp-6)',
+        height: 60,
+        display: 'flex',
+        alignItems: 'center',
+        background: 'rgba(10,10,10,0.7)',
+        backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <Link to="/" style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          textDecoration: 'none',
+        }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: 'var(--green-500)', display: 'inline-block',
+          }} />
+          <span style={{
+            fontFamily: 'var(--font-display)', fontSize: 16,
+            fontWeight: 600, color: 'var(--always-white)',
+          }}>MedMarket India</span>
+        </Link>
+      </nav>
+
     <div style={{
       minHeight: '100vh',
       background: 'var(--always-dark)',
@@ -131,12 +158,8 @@ export default function NotFound() {
           </motion.button>
         </div>
 
-        {/* Brand */}
-        <div style={{ marginTop: 'var(--sp-10)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green-500)', display: 'inline-block' }} />
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--always-sub)', fontWeight: 600 }}>MedMarket India</span>
-        </div>
       </motion.div>
+    </div>
     </div>
   );
 }

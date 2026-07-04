@@ -536,51 +536,6 @@
   flex-wrap: wrap;
 }
 
-/* ── Footer ── */
-.footer {
-  background: var(--always-dark);
-  padding: var(--sp-8) 0;
-}
-
-.footerTop {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-6);
-  padding-bottom: var(--sp-6);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-  margin-bottom: var(--sp-5);
-}
-
-.footerBrand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.brandDot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--r-full);
-  background: var(--green-500);
-}
-
-.brandName {
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--always-white);
-}
-
-.footerBottom {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--always-sub-faint);
-  flex-wrap: wrap;
-  gap: var(--sp-3);
-}
-
 @media (max-width: 1024px) {
   .heroVisual { display: none; }
   .pharmacyGrid { grid-template-columns: 1fr; }
@@ -590,5 +545,4 @@
 @media (max-width: 768px) {
   .statsStrip { flex-wrap: wrap; }
   .statItem { min-width: 45%; border-right: none; border-bottom: 1px solid var(--ink-200); }
-  .footerTop { flex-direction: column; }
 }

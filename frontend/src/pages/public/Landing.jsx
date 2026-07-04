@@ -388,24 +388,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className={styles.footer}>
-        <div className={styles.sectionInner}>
-          <div className={styles.footerTop}>
-            <div className={styles.footerBrand}>
-              <span className={styles.brandDot} />
-              <span className={styles.brandName}>MedMarket India</span>
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--ink-500)', maxWidth: 340 }}>
-              India's CDSCO-compliant medicine marketplace. Verified pharmacies, transparent pricing, real-time tracking.
-            </div>
-          </div>
-          <div className={styles.footerBottom}>
-            <span>© 2026 MedMarket India. All rights reserved.</span>
-            <span>CDSCO Compliant · DPCO Enforced · GST Verified</span>
-          </div>
-        </div>
-      </footer>
       <DemoBanner />
     </div>
   );

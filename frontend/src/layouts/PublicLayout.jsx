@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import PublicNav from '../components/ui/PublicNav';
 import PageTransition from '../components/ui/PageTransition';
+import PublicFooter from '../components/ui/PublicFooter';
 
 // Pages whose hero intentionally sits behind the transparent nav (no padding needed)
 const FULL_BLEED_PAGES = ['/', '/for-pharmacies', '/how-it-works', '/about'];
@@ -23,6 +24,7 @@ export default function PublicLayout() {
           </PageTransition>
         </AnimatePresence>
       </div>
+      {!isAuthPage && <PublicFooter />}
     </div>
   );
 }

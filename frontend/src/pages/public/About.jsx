@@ -10,10 +10,10 @@ const values = [
 ];
 
 const stats = [
-  { val: '142+', label: 'Verified Pharmacies' },
-  { val: '8,400+', label: 'Patients Served' },
-  { val: '6', label: 'Cities in Haryana' },
-  { val: '₹18L+', label: 'Monthly GMV' },
+  { val: '2,400+', label: 'Verified Pharmacies' },
+  { val: '1.2L+',  label: 'Patients Served' },
+  { val: '99.1%',  label: 'Order Accuracy' },
+  { val: '< 45min', label: 'Avg. Delivery Time' },
 ];
 
 export default function About() {
