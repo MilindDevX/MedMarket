@@ -5,6 +5,20 @@ import { successResponse, errorResponse } from "../utils/response.ts";
 import { createNotification } from "./notification.controller.ts";
 import { cloudinary } from "../lib/cloudinary.ts";
 
+/** Build a signed Cloudinary URL consistent with document.controller.ts */
+function buildDocUrl(s3_key: string, mime_type: string): string {
+  if (!s3_key) return '';
+  if (mime_type === 'application/pdf') {
+    // PDFs are uploaded as resource_type 'raw' — must specify that here
+    // or Cloudinary generates a broken image URL
+    return cloudinary.url(s3_key, {
+      resource_type: 'raw',
+      secure: true,
+    });
+  }
+  return cloudinary.url(s3_key, { resource_type: 'image', secure: true });
+}
+
 export async function listUsers(req: Request, res: Response) {
   try {
     const users = await prisma.user.findMany({
@@ -54,13 +68,10 @@ export async function getApplication(req: Request, res: Response) {
     });
     if (!store) return errorResponse(res, "Application not found", 404);
 
-    const docsWithUrls = (store.documents || []).map((doc: any) => {
-      const resourceType = doc.mime_type === 'application/pdf' ? 'raw' : 'image';
-      const url = doc.s3_key
-        ? cloudinary.url(doc.s3_key, { resource_type: resourceType, secure: true })
-        : null;
-      return { ...doc, url };
-    });
+    const docsWithUrls = (store.documents || []).map((doc: any) => ({
+      ...doc,
+      url: buildDocUrl(doc.s3_key, doc.mime_type),
+    }));
 
     return successResponse(res, { ...store, documents: docsWithUrls }, "Application fetched successfully");
   } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }

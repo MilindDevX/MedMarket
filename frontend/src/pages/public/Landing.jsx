@@ -189,12 +189,12 @@ export default function Landing() {
             transition={{ delay: 0.55, type: 'spring', stiffness: 200 }}
           >
             <div className={styles.alertRow}>
-              <AlertTriangle size={14} strokeWidth={2} style={{ color: 'var(--warning-dark)' }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-800)' }}>Expiry Alert</span>
-              <span style={{ fontSize: 11, color: 'var(--ink-500)', marginLeft: 'auto' }}>28 days</span>
+              <AlertTriangle size={14} strokeWidth={2} style={{ color: 'var(--warning-light)' }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--always-white)' }}>Expiry Alert</span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginLeft: 'auto' }}>28 days</span>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-900)', marginTop: 6 }}>ORS Electral · 60 strips</div>
-            <div style={{ fontSize: 11, color: 'var(--ink-500)' }}>Batch MFG/2024/B044 · EXP 19 Apr 2026</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--always-white)', marginTop: 6 }}>ORS Electral · 60 strips</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Batch MFG/2024/B044 · EXP 19 Apr 2026</div>
           </motion.div>
 
           <motion.div

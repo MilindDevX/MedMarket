@@ -21,14 +21,14 @@ export default function ConsumerHome() {
   const navigate = useNavigate();
   usePageTitle('Find Medicines Near You');
 
-  const { city, detecting, error: locationError, setCity, detectLocation, clear } = useLocationStore();
+  const { city, lat, lng, detecting, error: locationError, setCity, detectLocation, clear } = useLocationStore();
 
   // cityInput is only local display state — syncs from store whenever store.city changes
   const [cityInput, setCityInput] = useState(city);
   useEffect(() => { setCityInput(city); }, [city]);
 
   const { medicines: popularMeds } = useMedicines('', '');
-  const { stores: nearbyStores }   = useStores(city);
+  const { stores: nearbyStores } = useStores({ city, lat, lng });
 
   const handleSearch = (e) => {
     e.preventDefault();
