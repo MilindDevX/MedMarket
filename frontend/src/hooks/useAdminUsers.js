@@ -1,22 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../utils/api';
 
-export function useAdminUsers() {
+export function useAdminUsers({ role = '' } = {}) {
   const [users,   setUsers]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
 
   const fetch = useCallback(() => {
     setLoading(true);
-    api.get('/admin/users')
+    const url = role ? `/admin/users?role=${role}` : '/admin/users';
+    api.get(url)
       .then(res => { setUsers(res.data); setError(null); })
       .catch(err => {
-        // Endpoint may not exist yet — set empty array, not an error
         setUsers([]);
         setError(err.message);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [role]);
 
   useEffect(() => { fetch(); }, [fetch]);
 

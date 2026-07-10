@@ -182,13 +182,25 @@ export async function updateInventory(req: Request, res: Response) {
         where: { id: item.medicine_id },
       });
 
-      if (medicine && Number(selling_price) > Number(medicine.mrp)) {
-        return errorResponse(
-          res,
-          `Selling price cannot exceed MRP of ₹${medicine.mrp} (DPCO compliance)`,
-          400,
-          ErrorCode.PRICE_EXCEEDS_MRP,
-        );
+      if (medicine) {
+        // Enforce OTC-only rule on price updates too
+        if (medicine.schedule !== 'otc') {
+          return errorResponse(
+            res,
+            `Cannot update pricing for a non-OTC medicine ('${medicine.name}' is ${medicine.schedule.replace(/_/g, ' ').toUpperCase()}). Remove this item from inventory instead.`,
+            422,
+            ErrorCode.SCHEDULE_BLOCKED,
+          );
+        }
+
+        if (Number(selling_price) > Number(medicine.mrp)) {
+          return errorResponse(
+            res,
+            `Selling price cannot exceed MRP of ₹${medicine.mrp} (DPCO compliance)`,
+            400,
+            ErrorCode.PRICE_EXCEEDS_MRP,
+          );
+        }
       }
     }
 
