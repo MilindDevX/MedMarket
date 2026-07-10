@@ -31,8 +31,8 @@ export default function AdminOrders() {
   const [status,    setStatus]    = useState('all');
   const [expanded,  setExpanded]  = useState(null);
   const [page,      setPage]      = useState(1);
-  const PAGE_SIZE = 25;
-  const { orders, loading }       = useAdminOrders();
+  const PAGE_SIZE = 50;
+  const { orders, total, loading } = useAdminOrders({ page });
 
   const filtered = orders.filter(o => {
     const q = search.toLowerCase();
@@ -43,11 +43,17 @@ export default function AdminOrders() {
     const matchStatus = status === 'all' || o.status === status;
     return matchSearch && matchStatus;
   });
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+  // When filtering locally, compute pages from filtered; otherwise use server total
+  const isFiltered = search || status !== 'all';
+  const totalPages  = isFiltered
+    ? Math.ceil(filtered.length / PAGE_SIZE)
+    : Math.ceil(total / PAGE_SIZE);
+  const paginated   = isFiltered
+    ? filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    : orders;
 
   const counts = {
-    total:     orders.length,
+    total:     total || orders.length,
     active:    orders.filter(o => !['delivered','rejected','cancelled'].includes(o.status)).length,
     delivered: orders.filter(o => o.status === 'delivered').length,
     cancelled: orders.filter(o => ['rejected','cancelled'].includes(o.status)).length,

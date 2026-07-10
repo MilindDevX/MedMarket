@@ -1,0 +1,1 @@
+-- Baseline: migration applied directly to DB

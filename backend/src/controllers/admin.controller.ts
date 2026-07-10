@@ -21,9 +21,20 @@ function buildDocUrl(s3_key: string, mime_type: string): string {
 
 export async function listUsers(req: Request, res: Response) {
   try {
+    const { role } = req.query;
+    // Default to all non-admin users (consumers + pharmacy_owners).
+    // Pass ?role=all to include admins, ?role=consumer to filter to consumers only.
+    const roleFilter = typeof role === 'string' && role !== 'all'
+      ? { role: role as any }
+      : { role: { not: 'admin' as any } };
+
     const users = await prisma.user.findMany({
-      where: { role: 'consumer' },
-      select: { id:true, name:true, email:true, mobile:true, is_active:true, created_at:true, _count: { select: { orders:true } } },
+      where: roleFilter,
+      select: {
+        id: true, name: true, email: true, mobile: true,
+        role: true, is_active: true, created_at: true,
+        _count: { select: { orders: true } },
+      },
       orderBy: { created_at: 'desc' },
     });
     return successResponse(res, users, 'Users fetched');
@@ -176,15 +187,31 @@ export async function updatePharmacyDetails(req: Request, res: Response) {
 
 export async function getAllOrders(req: Request, res: Response) {
   try {
-    const orders = await prisma.order.findMany({
-      include: {
-        items: true,
-        consumer: { select: { id:true, name:true, mobile:true } },
-        store:    { select: { id:true, name:true, city:true } },
-      },
-      orderBy: { created_at: 'desc' },
-    });
-    return successResponse(res, orders, 'Orders fetched');
+    const page  = Math.max(1, parseInt(String(req.query.page  || '1'),  10));
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '50'), 10)));
+    const skip  = (page - 1) * limit;
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        include: {
+          items:    true,
+          consumer: { select: { id: true, name: true } },
+          store:    { select: { id: true, name: true, city: true } },
+        },
+        orderBy: { created_at: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.order.count(),
+    ]);
+
+    return successResponse(res, {
+      data:    orders,
+      total,
+      page,
+      limit,
+      hasMore: skip + orders.length < total,
+    }, 'Orders fetched');
   } catch (err) {
     console.error('getAllOrders error:', err);
     return errorResponse(res, 'Something went wrong', 500, ErrorCode.INTERNAL_ERROR);
@@ -193,69 +220,104 @@ export async function getAllOrders(req: Request, res: Response) {
 
 export async function getPharmacyAnalytics(req: Request, res: Response) {
   try {
-    const { id } = req.params;
+    const storeId = String(req.params.id);
     const store = await prisma.pharmacyStore.findUnique({
-  // @ts-ignore
-      where: { id },
+      where: { id: storeId },
       select: { id: true, name: true, city: true, status: true },
     });
     if (!store) return errorResponse(res, 'Store not found', 404);
 
-    const orders = await prisma.order.findMany({
-  // @ts-ignore
-      where: { store_id: id },
-      include: { items: true },
-      orderBy: { created_at: 'desc' },
-    });
+    // ── All aggregation pushed to PostgreSQL — no JS-level iteration ──
+    const [gmvAgg, statusGroups, itemAgg, dailyAgg] = await Promise.all([
+      // Total GMV for delivered orders
+      prisma.order.aggregate({
+        where: { store_id: storeId, status: 'delivered' },
+        _sum:   { total_amount: true },
+        _count: { _all: true },
+      }),
 
-    const delivered  = orders.filter(o => o.status === 'delivered');
-    const rejected   = orders.filter(o => o.status === 'rejected');
-    const cancelled  = orders.filter(o => o.status === 'cancelled');
-    const totalGmv   = delivered.reduce((s, o) => s + Number(o.total_amount || 0), 0);
-    const avgOrder   = delivered.length > 0 ? totalGmv / delivered.length : 0;
-    const terminal   = delivered.length + rejected.length + cancelled.length;
-    const fulfillmentRate = terminal > 0 ? Math.round(delivered.length / terminal * 100) : 0;
-    const rejectionRate   = terminal > 0 ? Math.round(rejected.length  / terminal * 100) : 0;
+      // Order count per status
+      prisma.order.groupBy({
+        by:     ['status'],
+        where:  { store_id: storeId },
+        _count: true,
+      }),
 
-    // 14-day GMV trend
+      // Top 6 medicines by units sold (delivered orders only)
+      prisma.orderItem.groupBy({
+        by:      ['medicine_name'],
+        where:   { order: { store_id: storeId, status: 'delivered' } },
+        _sum:    { quantity: true, line_total: true },
+        orderBy: { _sum: { quantity: 'desc' } },
+        take:    6,
+      }),
+
+      // 14-day daily GMV + order count
+      prisma.order.groupBy({
+        by:    ['created_at'],
+        where: {
+          store_id:   storeId,
+          created_at: { gte: new Date(Date.now() - 14 * 86400000) },
+        },
+        _sum:   { total_amount: true },
+        _count: true,
+      }),
+    ]);
+
+    // Compute rates from status groups
+    const statusMap: Record<string, number> = {};
+    let totalOrders = 0;
+    for (const row of statusGroups) {
+      const cnt = typeof row._count === 'number' ? row._count : (row._count as any)?._all ?? 0;
+      statusMap[row.status] = cnt;
+      totalOrders += cnt;
+    }
+    const delivered       = statusMap['delivered']  || 0;
+    const rejected        = statusMap['rejected']   || 0;
+    const cancelled       = statusMap['cancelled']  || 0;
+    const terminal        = delivered + rejected + cancelled;
+    const totalGmv        = Number(gmvAgg._sum?.total_amount ?? 0);
+    const avgOrder        = delivered > 0 ? totalGmv / delivered : 0;
+    const fulfillmentRate = terminal > 0 ? Math.round(delivered / terminal * 100) : 0;
+    const rejectionRate   = terminal > 0 ? Math.round(rejected  / terminal * 100) : 0;
+
+    // Build 14-day trend buckets from raw groupBy rows
+    const bucketMap: Record<string, { gmv: number; orders: number }> = {};
+    for (const row of dailyAgg) {
+      const dateStr = row.created_at.toISOString().slice(0, 10);
+      if (!bucketMap[dateStr]) bucketMap[dateStr] = { gmv: 0, orders: 0 };
+      bucketMap[dateStr].gmv    += Number(row._sum?.total_amount ?? 0);
+      const cnt = typeof row._count === 'number' ? row._count : (row._count as any)?._all ?? 0;
+      bucketMap[dateStr].orders += cnt;
+    }
     const gmvByDay = [];
     for (let i = 13; i >= 0; i--) {
-      const d = new Date();
+      const d       = new Date();
       d.setDate(d.getDate() - i);
-      const label   = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
       const dateStr = d.toISOString().slice(0, 10);
-      const rev     = delivered
-        .filter(o => o.created_at.toISOString().slice(0, 10) === dateStr)
-        .reduce((s, o) => s + Number(o.total_amount || 0), 0);
-      const ordCnt  = orders.filter(o => o.created_at.toISOString().slice(0, 10) === dateStr).length;
-      gmvByDay.push({ day: label, gmv: Math.round(rev), orders: ordCnt });
+      const label   = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const bucket  = bucketMap[dateStr] || { gmv: 0, orders: 0 };
+      gmvByDay.push({ day: label, gmv: Math.round(bucket.gmv), orders: bucket.orders });
     }
 
-    // Top medicines by units sold
-    const medMap: Record<string, { name: string; units: number; revenue: number }> = {};
-    delivered.forEach(o => {
-  // @ts-ignore
-      o.items.forEach((item: any) => {
-        const key = item.medicine_name;
-        if (!medMap[key]) medMap[key] = { name: key, units: 0, revenue: 0 };
-        medMap[key].units   += item.quantity;
-        medMap[key].revenue += Number(item.line_total || 0);
-      });
-    });
-    const topMedicines = Object.values(medMap)
-      .sort((a, b) => b.units - a.units)
-      .slice(0, 6);
+    // Format top medicines
+    const topMedicines = itemAgg.map(row => ({
+      name:    row.medicine_name,
+      units:   row._sum?.quantity   ?? 0,
+      revenue: Number(row._sum?.line_total ?? 0),
+    }));
 
-    // Order status distribution
-    const statusDist: Record<string, number> = {};
-    orders.forEach(o => { statusDist[o.status] = (statusDist[o.status] || 0) + 1; });
-    const orderStatusDist = Object.entries(statusDist).map(([name, value]) => ({ name, value }));
+    // Status distribution for pie chart
+    const orderStatusDist = statusGroups.map(row => ({
+      name:  row.status,
+      value: typeof row._count === 'number' ? row._count : (row._count as any)?._all ?? 0,
+    }));
 
     return successResponse(res, {
       store,
-      totalOrders: orders.length,
-      totalGmv: Math.round(totalGmv),
-      avgOrder: Math.round(avgOrder),
+      totalOrders,
+      totalGmv:        Math.round(totalGmv),
+      avgOrder:        Math.round(avgOrder),
       fulfillmentRate,
       rejectionRate,
       gmvByDay,

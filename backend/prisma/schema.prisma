@@ -104,6 +104,8 @@ model User {
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
+  @@index([role, is_active])
+
   pharmacies         PharmacyStore[]    @relation("UserPharmacies")
   verifiedStores     PharmacyStore[]    @relation("StoreVerifier")
   medicinesCreated   MedicineMaster[]
@@ -171,6 +173,7 @@ model PharmacyStore {
   orders      Order[]
 
   @@index([owner_id])
+  @@index([status])
 }
 
 model StoreDocument {
@@ -325,6 +328,7 @@ model Order {
 
   @@index([consumer_id])
   @@index([store_id])
+  @@index([status, created_at])
 }
 
 model OrderItem {
