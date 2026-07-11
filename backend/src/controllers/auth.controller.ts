@@ -166,7 +166,16 @@ export async function login(req: Request, res: Response) {
       return errorResponse(res, "Your account has been deactivated. Please contact support.", 403);
     }
 
-  // @ts-ignore
+    // Google-only accounts have no password_hash set
+    if (!user.password_hash) {
+      return errorResponse(
+        res,
+        "This account was created with Google Sign-In. Please use 'Continue with Google' to log in.",
+        401,
+        ErrorCode.INVALID_CREDENTIALS,
+        401,
+      );
+    }
     const valid = await comparePassword(password, user.password_hash);
     if (!valid) {
       return errorResponse(res, "Invalid credentials", 401, ErrorCode.INVALID_CREDENTIALS, 401);

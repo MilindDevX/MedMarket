@@ -29,7 +29,7 @@ export default function PharmacyOrders() {
   const [rejectModal, setRejectModal] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const toast = useToastStore();
-  const { orders, loading, error, updateStatus } = usePharmacyOrders();
+  const { orders, loading, error, isLive, updateStatus } = usePharmacyOrders();
 
   const shown = orders.filter(o =>
     tab === 'active'
@@ -70,7 +70,15 @@ export default function PharmacyOrders() {
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:'var(--sp-5)', flexWrap:'wrap', gap:'var(--sp-3)' }}>
         <div>
           <h1 style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:600, color:'var(--ink-900)', letterSpacing:'-0.3px' }}>Orders</h1>
-          <p style={{ fontSize:13, color:'var(--ink-500)', marginTop:4 }}>{counts.active} active · {counts.past} past</p>
+          <p style={{ fontSize:13, color:'var(--ink-500)', marginTop:4, display:'flex', alignItems:'center', gap:8 }}>
+            {counts.active} active · {counts.past} past
+            {isLive && (
+              <span style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color:'var(--green-700)', background:'#DCFCE7', borderRadius:9999, padding:'2px 8px', letterSpacing:'0.04em' }}>
+                <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--green-700)', animation:'pulse 1.5s ease-in-out infinite' }} />
+                LIVE
+              </span>
+            )}
+          </p>
         </div>
         {/* Tab toggle */}
         <div style={{ display:'flex', background:'var(--ink-100)', borderRadius:10, padding:3, gap:2 }}>

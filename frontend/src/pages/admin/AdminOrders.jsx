@@ -108,7 +108,18 @@ export default function AdminOrders() {
           </p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className={styles.empty}>No orders match your filters.</div>
+        <div style={{ textAlign:'center', padding:'var(--sp-12)', background:'var(--white)', border:'1px solid var(--ink-200)', borderRadius:14 }}>
+          <Package size={36} strokeWidth={1} style={{ margin:'0 auto var(--sp-3)', display:'block', color:'var(--ink-300)' }} />
+          <p style={{ fontSize:15, fontWeight:600, color:'var(--ink-700)', marginBottom:6 }}>No orders match your filters</p>
+          <p style={{ fontSize:13, color:'var(--ink-400)', marginBottom:'var(--sp-4)' }}>
+            Try adjusting your search or status filter.
+          </p>
+          <button
+            onClick={() => { setSearch(''); setStatus('all'); setPage(1); }}
+            style={{ padding:'8px 20px', background:'var(--ink-900)', color:'var(--white)', border:'none', borderRadius:'var(--r-md)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>
+            Clear filters
+          </button>
+        </div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-2)' }}>
           {paginated.map((o, i) => {

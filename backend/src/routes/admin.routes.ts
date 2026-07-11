@@ -3,7 +3,7 @@ import {
   listApplications, getApplication, approveApplication, reactivateApplication,
   rejectApplicaton, listUsers, toggleUserActive, suspendApplication,
   updatePharmacyDetails, getAllOrders, listComplaints, updateComplaint,
-  getPharmacyAnalytics,
+  getPharmacyAnalytics, getPlatformAnalytics,
 } from "../controllers/admin.controller.ts";
 import { verifyPharmacyDocuments } from "../controllers/ai.controller.ts";
 import { getDashboard }              from "../controllers/dashboard.controller.ts";
@@ -37,7 +37,8 @@ router.patch("/users/:id/toggle",         authenticate, requireAdmin, toggleUser
 // ── Orders ──
 router.get("/orders",                     authenticate, requireAdmin, getAllOrders);
 
-// ── Pharmacy Analytics ──
+// ── Analytics ──
+router.get("/analytics/platform",         authenticate, requireAdmin, getPlatformAnalytics);
 router.get("/analytics/pharmacy/:id",     authenticate, requireAdmin, getPharmacyAnalytics);
 
 // ── Complaints ──

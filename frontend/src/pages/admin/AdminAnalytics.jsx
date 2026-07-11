@@ -1,15 +1,13 @@
 import usePageTitle from '../../utils/usePageTitle';
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, MapPin, Store, ShoppingCart, Users, Clock, CheckCircle, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { TrendingUp, Store, ShoppingCart, Users, Clock, CheckCircle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend,
   AreaChart, Area, LineChart, Line
 } from 'recharts';
-import { useAdminPharmacies } from '../../hooks/useAdminPharmacies';
-import { useAdminOrders } from '../../hooks/useAdminOrders';
-import { useAdminUsers } from '../../hooks/useAdminUsers';
+import { useAdminPlatformAnalytics } from '../../hooks/useAdminPlatformAnalytics';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 
 const fmtMoney = (v) => {
@@ -30,141 +28,41 @@ const cardTitle = { fontSize:16, fontWeight:700, color:'var(--ink-900)', letterS
 
 export default function AdminAnalytics() {
   usePageTitle('Platform Analytics');
-  const { apps,   loading: appsLoading   } = useAdminPharmacies('');
-  const { orders, loading: ordersLoading } = useAdminOrders();
-  const { users,  loading: usersLoading  } = useAdminUsers();
+  const { data, loading, error } = useAdminPlatformAnalytics();
 
-  const [activeTab, setActiveTab]   = useState('overview');  // 'overview' | 'breakdown'
-  const [sortKey,   setSortKey]     = useState('orders');
-  const [sortDir,   setSortDir]     = useState('desc');
+  const [activeTab, setActiveTab] = useState('overview');  // 'overview' | 'breakdown'
+  const [sortKey,   setSortKey]   = useState('orders');
+  const [sortDir,   setSortDir]   = useState('desc');
 
-  const loading = appsLoading || ordersLoading || usersLoading;
-
-  const stats = useMemo(() => {
-    const delivered = orders.filter(o => o.status === 'delivered');
-    const rejected  = orders.filter(o => o.status === 'rejected');
-    const totalGmv  = delivered.reduce((s, o) => s + Number(o.total_amount || 0), 0);
-    const avgOrder  = delivered.length > 0 ? totalGmv / delivered.length : 0;
-
-    // Platform fulfillment/rejection rates
-    const terminal        = delivered.length + rejected.length + orders.filter(o => o.status === 'cancelled').length;
-    const fulfillmentRate = terminal > 0 ? Math.round(delivered.length / terminal * 100) : 0;
-    const rejectionRate   = terminal > 0 ? Math.round(rejected.length  / terminal * 100) : 0;
-
-    // 14-day GMV trend
-    const gmvByDay = [];
-    for (let i = 13; i >= 0; i--) {
-      const d       = new Date();
-      d.setDate(d.getDate() - i);
-      const label   = d.toLocaleDateString('en-IN', { day:'numeric', month:'short' });
-      const dateStr = d.toISOString().slice(0, 10);
-      const rev     = delivered
-        .filter(o => o.created_at?.slice(0, 10) === dateStr)
-        .reduce((s, o) => s + Number(o.total_amount || 0), 0);
-      const ordCnt  = orders.filter(o => o.created_at?.slice(0, 10) === dateStr).length;
-      gmvByDay.push({ day: label, gmv: Math.round(rev), orders: ordCnt });
-    }
-
-    // City-wise order distribution
-    const cityMap = {};
-    orders.forEach(o => {
-      const city = o.store?.city || 'Unknown';
-      if (!cityMap[city]) cityMap[city] = { city, orders: 0, gmv: 0 };
-      cityMap[city].orders += 1;
-      if (o.status === 'delivered') cityMap[city].gmv += Number(o.total_amount || 0);
-    });
-    const cityRanking = Object.values(cityMap)
-      .sort((a, b) => b.orders - a.orders)
-      .slice(0, 8);
-
-    // Platform-wide top medicines
-    const medMap = {};
-    delivered.forEach(o => {
-      o.items?.forEach(item => {
-        const key = item.medicine_name;
-        if (!medMap[key]) medMap[key] = { name: key, units: 0, revenue: 0 };
-        medMap[key].units   += item.quantity;
-        medMap[key].revenue += Number(item.line_total || 0);
-      });
-    });
-    const topMedicines = Object.values(medMap)
-      .sort((a, b) => b.units - a.units)
-      .slice(0, 8);
-
-    // Store status breakdown
-    const storeStatusMap = { pending:0, approved:0, rejected:0, suspended:0 };
-    apps.forEach(a => { if (storeStatusMap[a.status] !== undefined) storeStatusMap[a.status]++; });
-    const storeStatusDist = Object.entries(storeStatusMap)
-      .map(([name, value]) => ({ name, value }))
-      .filter(d => d.value > 0);
-
-    // Pharmacy approval turnaround (approved stores)
-    const approvedStores = apps.filter(a => a.status === 'approved' && a.verified_at && a.created_at);
-    const avgTurnaround  = approvedStores.length > 0
-      ? approvedStores.reduce((s, a) => {
-          const days = Math.round((new Date(a.verified_at) - new Date(a.created_at)) / 86400000);
-          return s + days;
-        }, 0) / approvedStores.length
-      : 0;
-
-    // New consumer registrations — last 7 days
-    const regByDay = [];
-    for (let i = 6; i >= 0; i--) {
-      const d       = new Date();
-      d.setDate(d.getDate() - i);
-      const label   = d.toLocaleDateString('en-IN', { day:'numeric', month:'short' });
-      const dateStr = d.toISOString().slice(0, 10);
-      const count   = (users || []).filter(u => u.created_at?.slice(0, 10) === dateStr).length;
-      regByDay.push({ day: label, registrations: count });
-    }
-
-    // Activation rate: consumers who placed ≥1 order
-    const consumersWhoOrdered = new Set(orders.map(o => o.consumer_id)).size;
-    const totalConsumers      = (users || []).length;
-    const activationRate      = totalConsumers > 0 ? Math.round(consumersWhoOrdered / totalConsumers * 100) : 0;
-
-    return {
-      totalGmv, avgOrder, totalOrders: orders.length, deliveredOrders: delivered.length,
-      fulfillmentRate, rejectionRate,
-      totalStores: apps.length, approvedStores: storeStatusMap.approved, pendingStores: storeStatusMap.pending,
-      avgTurnaround: Math.round(avgTurnaround),
-      totalConsumers, activationRate,
-      gmvByDay, cityRanking, topMedicines, storeStatusDist, regByDay,
-
-      // Pharmacy breakdown table — one row per approved store
-      pharmacyRows: apps.filter(a => a.status === 'approved').map(store => {
-        const storeOrders    = orders.filter(o => o.store_id === store.id);
-        const delivered      = storeOrders.filter(o => o.status === 'delivered');
-        const terminal       = storeOrders.filter(o => ['delivered','rejected','cancelled'].includes(o.status));
-        const gmv            = delivered.reduce((s, o) => s + Number(o.total_amount || 0), 0);
-        const avgOrderVal    = delivered.length > 0 ? gmv / delivered.length : 0;
-        const fulfillRate    = terminal.length  > 0 ? Math.round(delivered.length / terminal.length * 100) : 0;
-        const lastOrderDate  = storeOrders.length > 0
-          ? storeOrders.reduce((latest, o) => o.created_at > latest ? o.created_at : latest, '')
-          : null;
-        return {
-          id:          store.id,
-          name:        store.name,
-          city:        store.city || '—',
-          orders:      storeOrders.length,
-          gmv,
-          fulfillRate,
-          avgOrderVal,
-          lastActive:  lastOrderDate,
-        };
-      }),
-    };
-  }, [apps, orders, users]);
-
-  // Sort pharmacy breakdown table — must be before any early return (Rules of Hooks)
+  // Destructure from API response with safe defaults
   const {
-    totalGmv, avgOrder: _avgOrder, totalOrders, deliveredOrders: _del,
-    fulfillmentRate, rejectionRate,
-    totalStores: _ts, approvedStores, pendingStores, avgTurnaround,
-    totalConsumers: _tc, activationRate,
-    gmvByDay, cityRanking, topMedicines, storeStatusDist, regByDay,
-    pharmacyRows = [],
-  } = stats;
+    totalGmv        = 0,
+    totalOrders     = 0,
+    fulfillmentRate = 0,
+    rejectionRate   = 0,
+    approvedStores  = 0,
+    pendingStores   = 0,
+    avgTurnaround   = 0,
+    activationRate  = 0,
+    gmvByDay        = [],
+    regByDay        = [],
+    topMedicines    = [],
+    storeStatusDist = [],
+    pharmacyRows    = [],
+  } = data ?? {};
+
+  // City ranking derived from pharmacyRows (already has city + orders)
+  const cityRanking = useMemo(() => {
+    const cityMap = {};
+    pharmacyRows.forEach(r => {
+      if (!cityMap[r.city]) cityMap[r.city] = { city: r.city, orders: 0, gmv: 0 };
+      cityMap[r.city].orders += r.orders;
+      cityMap[r.city].gmv    += r.gmv;
+    });
+    return Object.values(cityMap).sort((a, b) => b.orders - a.orders).slice(0, 8);
+  }, [pharmacyRows]);
+
+  // Sort pharmacy breakdown table
   const sortedRows = useMemo(() => {
     return [...pharmacyRows].sort((a, b) => {
       const av = a[sortKey], bv = b[sortKey];
@@ -194,6 +92,14 @@ export default function AdminAnalytics() {
         {[1,2,3,4,5,6].map(i => <SkeletonCard key={i} lines={3} />)}
       </div>
       <SkeletonCard lines={8} /><SkeletonCard lines={6} />
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ textAlign:'center', padding:'var(--sp-12)', color:'var(--danger)' }}>
+      <CheckCircle size={32} strokeWidth={1} style={{ margin:'0 auto var(--sp-3)', display:'block', color:'var(--ink-300)' }} />
+      <p style={{ fontSize:15, fontWeight:600, marginBottom:8 }}>Failed to load analytics</p>
+      <p style={{ fontSize:13, color:'var(--ink-400)' }}>{error}</p>
     </div>
   );
 
