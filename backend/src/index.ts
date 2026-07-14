@@ -28,14 +28,23 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(helmet());
+
+// SEC-8: Support comma-separated CORS origins for staging + production
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')
+  .map(o => o.trim());
 app.use(cors({
-  origin:  process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin:  allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-app.use(morgan('dev'));
-app.use(express.json());
+
+// CQ-7: Use 'combined' format in production for structured logs
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// SEC-1: Limit JSON body size to prevent DoS via oversized payloads
+app.use(express.json({ limit: '1mb' }));
 app.use(generalLimiter);
 
 // ── API Docs — available at /api/docs ──

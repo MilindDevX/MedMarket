@@ -21,3 +21,8 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+// SEC-10: Warn if Cloudinary credentials are missing (required for pharmacy document uploads)
+if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+  console.warn('⚠️  Cloudinary credentials not set. Document upload features will fail at runtime.');
+}
