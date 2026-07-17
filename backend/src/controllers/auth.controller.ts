@@ -231,8 +231,18 @@ export async function refresh(req: Request, res: Response) {
       where: { token_hash: hashToken(refreshToken) },
     });
 
-    if (!stored || stored.revoked_at || stored.expires_at < new Date()) {
+    if (!stored || stored.expires_at < new Date()) {
       return errorResponse(res, "Invalid or expired refresh token", 401, ErrorCode.TOKEN_INVALID, 401);
+    }
+
+    // SEC-2: Token family revocation — if this token was already used/revoked,
+    // it means either theft or replay. Revoke ALL tokens for this user.
+    if (stored.revoked_at) {
+      await prisma.refreshToken.updateMany({
+        where: { user_id: stored.user_id, revoked_at: null },
+        data:  { revoked_at: new Date() },
+      });
+      return errorResponse(res, "Refresh token reuse detected. All sessions revoked for security.", 401, ErrorCode.TOKEN_INVALID, 401);
     }
 
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });

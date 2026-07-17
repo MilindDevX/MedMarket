@@ -74,21 +74,26 @@ export async function getMyStore(req: Request, res: Response) {
 }
 
 export async function updateMyStore(req: Request, res: Response) {
-  const store = await prisma.pharmacyStore.findFirst({ where: { owner_id: req.userId } });
-  if (!store) return errorResponse(res, 'Store not found', 404);
+  try {
+    const store = await prisma.pharmacyStore.findFirst({ where: { owner_id: req.userId } });
+    if (!store) return errorResponse(res, 'Store not found', 404);
 
-  const { phone, email, address_line, city, pincode } = req.body;
-  const updated = await prisma.pharmacyStore.update({
-    where: { id: store.id },
-    data: {
-      ...(phone        && { phone }),
-      ...(email        && { email }),
-      ...(address_line && { address_line }),
-      ...(city         && { city }),
-      ...(pincode      && { pincode }),
-    },
-  });
-  return successResponse(res, updated, 'Store updated');
+    const { phone, email, address_line, city, pincode } = req.body;
+    const updated = await prisma.pharmacyStore.update({
+      where: { id: store.id },
+      data: {
+        ...(phone        && { phone }),
+        ...(email        && { email }),
+        ...(address_line && { address_line }),
+        ...(city         && { city }),
+        ...(pincode      && { pincode }),
+      },
+    });
+    return successResponse(res, updated, 'Store updated');
+  } catch (err) {
+    console.error('updateMyStore error:', err);
+    return errorResponse(res, 'Something went wrong', 500);
+  }
 }
 
 /**

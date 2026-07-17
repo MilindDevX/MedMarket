@@ -6,7 +6,7 @@ import { validate, updateStoreSchema } from '../middleware/validate.middleware.t
 const router = Router();
 
 router.post('/',              authenticate, requireRole('pharmacy_owner'), registerStore);
-router.get('/me',             authenticate, getMyStore);
+router.get('/me',             authenticate, requireRole('pharmacy_owner'), getMyStore);
 router.patch('/me',           authenticate, requireRole('pharmacy_owner'), validate(updateStoreSchema), updateMyStore);
 router.get('/complaints',     authenticate, requireRole('pharmacy_owner'), getMyComplaints);
 router.patch('/complaints/:id/resolve', authenticate, requireRole('pharmacy_owner'), resolveMyComplaint);
