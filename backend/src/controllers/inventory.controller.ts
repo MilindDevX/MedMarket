@@ -204,13 +204,27 @@ export async function updateInventory(req: Request, res: Response) {
       }
     }
 
+    // BUG-3: Validate exp_date format before writing (same as addInventory)
+    let parsedExpDate: Date | undefined;
+    if (exp_date) {
+      parsedExpDate = new Date(exp_date);
+      if (isNaN(parsedExpDate.getTime())) {
+        return errorResponse(res, 'Invalid expiry date format', 400, ErrorCode.VALIDATION_ERROR);
+      }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (parsedExpDate <= today) {
+        return errorResponse(res, 'Expiry date must be in the future', 400, ErrorCode.VALIDATION_ERROR);
+      }
+    }
+
     const updated = await prisma.storeInventory.update({
       where: { id },
       data: {
         ...(quantity !== undefined            && { quantity: Number(quantity) }),
         ...(selling_price !== undefined       && { selling_price: Number(selling_price) }),
         ...(low_stock_threshold !== undefined && { low_stock_threshold: Number(low_stock_threshold) }),
-        ...(exp_date                          && { exp_date: new Date(exp_date) }),
+        ...(parsedExpDate                     && { exp_date: parsedExpDate }),
       },
     });
 

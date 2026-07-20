@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticate, requireRole } from "../middleware/auth.middleware.ts";
+import { orderLimiter } from "../middleware/rateLimit.middleware.ts";
 import {
   validate,
   placeOrderSchema,
@@ -18,7 +19,8 @@ const router = Router();
 
 
 // ── Consumer routes ──
-router.post("/",              authenticate, requireRole("consumer"), validate(placeOrderSchema), placeOrder);
+// CQ-6: Apply orderLimiter to prevent order spam (30 orders/hour)
+router.post("/",              authenticate, requireRole("consumer"), orderLimiter, validate(placeOrderSchema), placeOrder);
 router.get("/my",             authenticate, requireRole("consumer"), getMyOrders);
 router.get("/my/:id",         authenticate, requireRole("consumer"), getOrder);
 router.post("/my/:id/cancel", authenticate, requireRole("consumer"), cancelOrder);

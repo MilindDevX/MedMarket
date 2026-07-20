@@ -155,3 +155,56 @@ export const updateStoreSchema = z.object({
   (data) => Object.values(data).some((v) => v !== undefined),
   { message: "At least one field must be provided" },
 );
+
+// ── CQ-3: Missing Schemas ────────────────────────────────────────────────────
+
+// Pharmacy Store Registration
+export const registerStoreSchema = z.object({
+  name:            z.string().min(2).max(200),
+  drug_license_no: z.string().min(3).max(50),
+  gst_number:      z.string().min(10).max(20).optional(),
+  fssai_no:        z.string().max(20).optional(),
+  phone:           z.string().regex(/^[6-9]\d{9}$/, 'Invalid Indian mobile number'),
+  email:           z.string().email().optional(),
+  address_line:    z.string().min(3),
+  city:            z.string().min(1).max(100),
+  state:           z.string().min(1).max(100),
+  pincode:         z.string().regex(/^\d{6}$/, 'Pincode must be 6 digits'),
+});
+
+// Admin — Update Complaint
+export const updateComplaintSchema = z.object({
+  status:     z.enum(['open', 'investigating', 'resolved', 'dismissed']).optional(),
+  resolution: z.string().min(1).optional(),
+}).refine(
+  (data) => data.status || data.resolution,
+  { message: "At least status or resolution must be provided" },
+);
+
+// Admin — Update Pharmacy Details
+export const updatePharmacyDetailsSchema = z.object({
+  name:            z.string().min(2).max(200).optional(),
+  address_line:    z.string().min(1).optional(),
+  city:            z.string().min(1).max(100).optional(),
+  state:           z.string().min(1).max(100).optional(),
+  pincode:         z.string().regex(/^\d{6}$/, 'Pincode must be 6 digits').optional(),
+  phone:           z.string().regex(/^[6-9]\d{9}$/, 'Invalid Indian mobile number').optional(),
+  email:           z.string().email().optional(),
+  drug_license_no: z.string().min(3).max(50).optional(),
+  gst_number:      z.string().min(10).max(20).optional(),
+  fssai_no:        z.string().max(20).optional(),
+}).refine(
+  (data) => Object.values(data).some((v) => v !== undefined),
+  { message: "At least one field must be provided" },
+);
+
+// Admin — Update Platform Settings
+export const updatePlatformSettingsSchema = z.object({
+  cod_limit:                z.number().positive().optional(),
+  gst_rate:                 z.number().min(0).max(100).optional(),
+  delivery_fee:             z.number().min(0).optional(),
+  free_delivery_threshold:  z.number().min(0).optional(),
+}).refine(
+  (data) => Object.values(data).some((v) => v !== undefined),
+  { message: "At least one field must be provided" },
+);

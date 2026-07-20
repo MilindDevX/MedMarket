@@ -1,7 +1,7 @@
 import { Router } from "express";
 import {
   listApplications, getApplication, approveApplication, reactivateApplication,
-  rejectApplicaton, listUsers, toggleUserActive, suspendApplication,
+  rejectApplication, listUsers, toggleUserActive, suspendApplication,
   updatePharmacyDetails, getAllOrders, listComplaints, updateComplaint,
   getPharmacyAnalytics, getPlatformAnalytics,
 } from "../controllers/admin.controller.ts";
@@ -25,7 +25,7 @@ router.get("/applications",               authenticate, requireAdmin, listApplic
 router.get("/applications/:id",           authenticate, requireAdmin, getApplication);
 router.patch("/applications/:id/approve",    authenticate, requireAdmin, approveApplication);
 router.patch("/applications/:id/reactivate", authenticate, requireAdmin, reactivateApplication);
-router.patch("/applications/:id/reject",     authenticate, requireAdmin, rejectApplicaton);
+router.patch("/applications/:id/reject",     authenticate, requireAdmin, rejectApplication);
 router.patch("/applications/:id/suspend",    authenticate, requireAdmin, suspendApplication);
 router.patch("/applications/:id",            authenticate, requireAdmin, updatePharmacyDetails);
 router.post("/applications/:id/ai-verify",   authenticate, requireAdmin, verifyPharmacyDocuments);
