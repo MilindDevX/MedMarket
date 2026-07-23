@@ -14,6 +14,17 @@ export async function placeOrder(req: Request, res: Response) {
     const store = await prisma.pharmacyStore.findFirst({ where: { id: store_id, status: "approved" } });
     if (!store) return errorResponse(res, "Store not found or not approved", 404, ErrorCode.STORE_NOT_FOUND);
 
+    // SEC-4: Read platform settings instead of hardcoding COD/GST/delivery values
+    const settings = await prisma.platformSettings.upsert({
+      where:  { id: 'singleton' },
+      update: {},
+      create: { id: 'singleton', updated_at: new Date() },
+    });
+    const codLimit            = Number(settings.cod_limit);
+    const gstRate             = Number(settings.gst_rate) / 100; // stored as percentage
+    const baseDeliveryFee     = Number(settings.delivery_fee);
+    const freeDeliveryThreshold = Number(settings.free_delivery_threshold);
+
     const order = await prisma.$transaction(async (tx: any) => {
       let subtotal = 0;
       const orderItems: { inventory_id:string; medicine_name:string; salt_composition:string; batch_number:string; quantity:number; unit_price:Decimal; line_total:number; mrp_at_order:Decimal }[] = [];
@@ -22,26 +33,43 @@ export async function placeOrder(req: Request, res: Response) {
         const inventory = await tx.storeInventory.findFirst({ where: { id: item.inventory_id, store_id, status: "active" }, include: { medicine: true } });
         if (!inventory) throw new Error(`Inventory item ${item.inventory_id} not found`);
         if (inventory.quantity < item.quantity) throw new Error(`Insufficient stock for ${inventory.medicine.name}`);
+
+        // BUG-2: Check if this batch has been blacklisted/recalled
+        const isBlacklisted = await tx.blacklistedBatch.findFirst({
+          where: { medicine_id: inventory.medicine_id, batch_number: inventory.batch_number },
+        });
+        if (isBlacklisted) throw new Error(`Batch ${inventory.batch_number} of ${inventory.medicine.name} has been recalled and cannot be ordered.`);
+
         const lineTotal = Number(inventory.selling_price) * item.quantity;
         subtotal += lineTotal;
         orderItems.push({ inventory_id: inventory.id, medicine_name: inventory.medicine.name, salt_composition: inventory.medicine.salt_composition, batch_number: inventory.batch_number, quantity: item.quantity, unit_price: inventory.selling_price, line_total: lineTotal, mrp_at_order: inventory.medicine.mrp });
       }
 
-      if (payment_method === "cod" && subtotal > 2000) throw new Error("COD not available for orders above ₹2000");
+      if (payment_method === "cod" && subtotal > codLimit) throw new Error(`COD not available for orders above ₹${codLimit}`);
 
-      const gst_amount = subtotal * 0.12;
-      const delivery_fee = delivery_type === "delivery" ? 30 : 0;
+      const gst_amount = subtotal * gstRate;
+      const delivery_fee = delivery_type === "delivery"
+        ? (subtotal >= freeDeliveryThreshold ? 0 : baseDeliveryFee)
+        : 0;
       const total_amount = subtotal + gst_amount + delivery_fee;
 
       const newOrder = await tx.order.create({ data: { consumer_id: req.userId, store_id, delivery_type, delivery_address: delivery_address || null, payment_method, subtotal, gst_amount, delivery_fee, total_amount, status: "confirmed", items: { create: orderItems } }, include: { items: true } });
-      for (const item of items) await tx.storeInventory.updateMany({ where: { id: item.inventory_id }, data: { quantity: { decrement: item.quantity } } });
+
+      // BUG-4: Race-safe stock deduction — verify quantity is still sufficient at write time
+      for (const item of items) {
+        const result = await tx.storeInventory.updateMany({
+          where: { id: item.inventory_id, quantity: { gte: item.quantity } },
+          data:  { quantity: { decrement: item.quantity } },
+        });
+        if (result.count === 0) throw new Error(`Stock for item ${item.inventory_id} was modified concurrently. Please retry.`);
+      }
       return newOrder;
     });
 
     await createNotification(store.owner_id, "order.new", "New order received", `Order #${order.id.slice(0,8).toUpperCase()} placed for ₹${Number(order.total_amount).toFixed(0)}. Please accept or reject within 30 minutes.`);
     return successResponse(res, order, "Order placed successfully", 201);
   } catch (error: any) {
-    const known = ["Inventory item","Insufficient stock","COD not available","not found"];
+    const known = ["Inventory item","Insufficient stock","COD not available","not found","recalled","concurrently"];
     if (known.some(e => error?.message?.includes(e))) return errorResponse(res, error.message, 400);
     return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR);
   }

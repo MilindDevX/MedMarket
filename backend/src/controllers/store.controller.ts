@@ -104,6 +104,9 @@ export async function getStoreById(req: Request, res: Response) {
       include: {
         inventory: {
           where: { status: "active", quantity: { gt: 0 } },
+          // PERF-6: Cap inventory response to prevent oversized payloads
+          take: 200,
+          orderBy: { medicine: { name: 'asc' } },
           include: {
             medicine: {
               select: {

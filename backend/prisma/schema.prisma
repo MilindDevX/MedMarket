@@ -445,6 +445,11 @@ model Complaint {
   created_at  DateTime @default(now())
   consumer    User     @relation(fields: [consumer_id], references: [id])
   order       Order?   @relation(fields: [order_id], references: [id])
+
+  // PERF-5: Indexes for common query patterns
+  @@index([consumer_id])
+  @@index([order_id])
+  @@index([status])
 }
 
 model PlatformSettings {

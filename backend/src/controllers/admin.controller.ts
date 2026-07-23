@@ -47,6 +47,12 @@ export async function listUsers(req: Request, res: Response) {
 export async function toggleUserActive(req: Request, res: Response) {
   try {
     const id   = req.params.id as string;
+
+    // SEC-7: Prevent admin from deactivating their own account
+    if (id === req.userId) {
+      return errorResponse(res, 'You cannot deactivate your own admin account', 400);
+    }
+
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return errorResponse(res, 'User not found', 404);
     const updated = await prisma.user.update({ where: { id }, data: { is_active: !user.is_active } });
@@ -123,7 +129,7 @@ export async function reactivateApplication(req: Request, res: Response) {
   } catch { return errorResponse(res, "Something went wrong", 500, ErrorCode.INTERNAL_ERROR); }
 }
 
-export async function rejectApplicaton(req: Request, res: Response) {
+export async function rejectApplication(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
     const { rejection_reason } = req.body;
@@ -371,6 +377,8 @@ export async function getPlatformAnalytics(req: Request, res: Response) {
     const day14Ago = new Date(now); day14Ago.setDate(now.getDate() - 13); day14Ago.setHours(0,0,0,0);
     const day7Ago  = new Date(now); day7Ago.setDate(now.getDate() - 6);   day7Ago.setHours(0,0,0,0);
 
+    // PERF-1: All queries in a single Promise.all — including totalOrders count
+    //         and per-store delivered/terminal/lastOrder groupBys
     const [
       totalAgg,
       statusGroups,
@@ -383,6 +391,10 @@ export async function getPlatformAnalytics(req: Request, res: Response) {
       approvedTurnaroundRaw,
       recentOrdersByDay,
       recentUsersByDay,
+      totalOrdersCount,
+      deliveredByStore,
+      terminalByStore,
+      lastOrderByStore,
     ] = await Promise.all([
       // 1. GMV + order counts
       prisma.order.aggregate({
@@ -442,11 +454,19 @@ export async function getPlatformAnalytics(req: Request, res: Response) {
         where:  { role: 'consumer', created_at: { gte: day7Ago } },
         select: { created_at: true },
       }),
+
+      // 12. PERF-1: Total order count (was orphaned outside Promise.all)
+      prisma.order.count(),
+
+      // 13–15. PERF-1: Per-store delivered/terminal/lastOrder (were in separate Promise.all)
+      prisma.order.groupBy({ by: ['store_id'], _count: { id: true }, where: { status: 'delivered' } }),
+      prisma.order.groupBy({ by: ['store_id'], _count: { id: true }, where: { status: { in: ['delivered','rejected','cancelled'] } } }),
+      prisma.order.groupBy({ by: ['store_id'], _max: { created_at: true } }),
     ]);
 
     // ── Compute derived values ────────────────────────────────────────────────
 
-    const totalOrders    = (await prisma.order.count());
+    const totalOrders    = totalOrdersCount;
     const deliveredCount = totalAgg._count.id;
     const totalGmv       = Number(totalAgg._sum.total_amount ?? 0);
 
@@ -498,12 +518,7 @@ export async function getPlatformAnalytics(req: Request, res: Response) {
       regByDay.push({ day: label, registrations: count });
     }
 
-    // City ranking from recent 14-day window
-    const cityMap: Record<string, { city: string; orders: number; gmv: number }> = {};
-    recentOrdersByDay.forEach(o => {
-      // We don't have city in this query — skip city here; frontend can use stale pharmacies data
-      // City breakdown is covered by pharmacyRows below
-    });
+    // BUG-1: Removed dead cityMap code — city breakdown is handled by pharmacyRows below
 
     // Top medicines
     const topMedicines = topMedRaw.map(m => ({
@@ -518,17 +533,10 @@ export async function getPlatformAnalytics(req: Request, res: Response) {
       storeAggMap[g.store_id] = { orders: g._count.id, gmv: Number(g._sum.total_amount ?? 0) };
     });
 
-    // Per-store delivered + terminal counts (from full order table for accuracy)
+    // Per-store delivered + terminal counts (PERF-1: now from the main Promise.all above)
     const storeDeliveredMap: Record<string, number>  = {};
     const storeTerminalMap:  Record<string, number>  = {};
     const storeLastOrderMap: Record<string, string>  = {};
-
-    // We need delivered/terminal counts per store — do this with two groupBys
-    const [deliveredByStore, terminalByStore, lastOrderByStore] = await Promise.all([
-      prisma.order.groupBy({ by: ['store_id'], _count: { id: true }, where: { status: 'delivered' } }),
-      prisma.order.groupBy({ by: ['store_id'], _count: { id: true }, where: { status: { in: ['delivered','rejected','cancelled'] } } }),
-      prisma.order.groupBy({ by: ['store_id'], _max: { created_at: true } }),
-    ]);
 
     deliveredByStore.forEach(g => { storeDeliveredMap[g.store_id] = g._count.id; });
     terminalByStore.forEach(g  => { storeTerminalMap[g.store_id]  = g._count.id; });
