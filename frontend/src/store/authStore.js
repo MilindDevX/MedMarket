@@ -105,9 +105,17 @@ const useAuthStore = create((set, get) => ({
 
   hydrate: () => {
     const { accessToken } = getTokens();
-    const stored = sessionStorage.getItem('user');
+    const stored = localStorage.getItem('user');
     if (accessToken && stored) {
       try {
+        // UX-2: Validate JWT expiry on hydrate to prevent stale sessions
+        const payload = JSON.parse(atob(accessToken.split('.')[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          // Token expired — clear everything
+          clearTokens();
+          return;
+        }
+
         const user = JSON.parse(stored);
         set({ user, role: user.role, isAuthenticated: true, pharmacyStatus: user.pharmacyStatus || null });
         if (user.role === 'pharmacy_owner') setTimeout(() => get()._fetchPharmacyStatus(), 100);

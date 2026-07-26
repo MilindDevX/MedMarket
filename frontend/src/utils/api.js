@@ -1,25 +1,26 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
+// UX-1: Switched from sessionStorage to localStorage so sessions survive tab close
 export function getTokens() {
   return {
-    accessToken:  sessionStorage.getItem('accessToken'),
-    refreshToken: sessionStorage.getItem('refreshToken'),
+    accessToken:  localStorage.getItem('accessToken'),
+    refreshToken: localStorage.getItem('refreshToken'),
   };
 }
 
 export function saveTokens(accessToken, refreshToken) {
-  sessionStorage.setItem('accessToken', accessToken);
-  if (refreshToken) sessionStorage.setItem('refreshToken', refreshToken);
+  localStorage.setItem('accessToken', accessToken);
+  if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
 }
 
 export function clearTokens() {
-  sessionStorage.removeItem('accessToken');
-  sessionStorage.removeItem('refreshToken');
-  sessionStorage.removeItem('user');
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
 }
 
 export function saveUser(user) {
-  sessionStorage.setItem('user', JSON.stringify(user));
+  localStorage.setItem('user', JSON.stringify(user));
 }
 
 async function refreshAccessToken() {
@@ -91,9 +92,11 @@ async function request(endpoint, options = {}) {
   return data;
 }
 
+// CQ-4: All HTTP verbs aligned — added `put` for full-resource updates
 export const api = {
   get:    (endpoint)       => request(endpoint, { method: 'GET' }),
   post:   (endpoint, body) => request(endpoint, { method: 'POST',   body: JSON.stringify(body) }),
   patch:  (endpoint, body) => request(endpoint, { method: 'PATCH',  body: JSON.stringify(body) }),
+  put:    (endpoint, body) => request(endpoint, { method: 'PUT',    body: JSON.stringify(body) }),
   delete: (endpoint)       => request(endpoint, { method: 'DELETE' }),
 };
