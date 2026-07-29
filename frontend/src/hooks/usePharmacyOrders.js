@@ -8,15 +8,17 @@ export function usePharmacyOrders(status) {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
   const [isLive,  setIsLive]  = useState(false);
-  const intervalRef = useRef(null);
+  const intervalRef  = useRef(null);
+  const isFirstLoad = useRef(true);
 
   const fetch = useCallback(() => {
     const query = status ? `?status=${status}` : '';
-    setLoading(true);
+    // UX-5: Only show loading spinner on initial fetch, not on poll refreshes
+    if (isFirstLoad.current) setLoading(true);
     api.get(`/orders/pharmacy${query}`)
       .then(res => { setOrders(res.data); setError(null); })
       .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+      .finally(() => { setLoading(false); isFirstLoad.current = false; });
   }, [status]);
 
   // Start / stop polling based on tab visibility

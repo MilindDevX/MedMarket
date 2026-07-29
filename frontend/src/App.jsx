@@ -7,6 +7,7 @@ import AdminLayout from './layouts/AdminLayout';
 import ConsumerLayout from './layouts/ConsumerLayout';
 import ToastContainer from './components/ui/ToastContainer';
 import ScrollToTop from './components/ui/ScrollToTop';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 
 // ── Inline imports for lightweight/always-needed pages ──
 import Landing from './pages/public/Landing';
@@ -79,6 +80,7 @@ function PageLoader() {
 export default function App() {
   return (
     <BrowserRouter>
+      <ErrorBoundary>
       <ScrollToTop />
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -151,6 +153,7 @@ export default function App() {
       </Suspense>
 
       <ToastContainer />
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }
