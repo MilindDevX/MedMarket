@@ -1,7 +1,7 @@
 import usePageTitle from '../../utils/usePageTitle';
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, Store, ShoppingCart, Users, Clock, CheckCircle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { TrendingUp, Store, ShoppingCart, Users, Clock, CheckCircle, ChevronUp, ChevronDown, ChevronsUpDown, MapPin } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend,
