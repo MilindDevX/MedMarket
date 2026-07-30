@@ -9,9 +9,9 @@ import {
 import styles from './Landing.module.css';
 
 const DEMO_CREDS = [
-  { role: 'Admin',    email: 'milind@medmarket.in',         password: 'Admin@1234',    color: '#7C3AED', bg: '#F5F3FF' },
-  { role: 'Consumer', email: 'priya@gmail.com',             password: 'Consumer@1234', color: '#1A56DB', bg: '#EFF6FF' },
-  { role: 'Pharmacy', email: 'rahul@medplus.in',            password: 'Pharma@1234',   color: '#0C6B4E', bg: '#ECFDF5' },
+  { role: 'Admin',    email: 'admin@medmarket.in',         password: 'Admin@1234',    color: '#7C3AED', bg: '#F5F3FF' },
+  { role: 'Consumer', email: 'priya@gmail.com',            password: 'Consumer@1234', color: '#1A56DB', bg: '#EFF6FF' },
+  { role: 'Pharmacy', email: 'owner_mumbai@pharma.in',     password: 'Pharma@1234',   color: '#0C6B4E', bg: '#ECFDF5' },
 ];
 
 function DemoBanner() {
