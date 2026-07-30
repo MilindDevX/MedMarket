@@ -17,6 +17,7 @@ vi.mock('../config/prisma.ts', () => ({
     pharmacyStore:  { findFirst: vi.fn() },
     storeInventory: { findFirst: vi.fn(), updateMany: vi.fn() },
     order:          { create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    platformSettings: { upsert: vi.fn().mockResolvedValue({ cod_limit: 2000, gst_rate: 18, delivery_fee: 50, free_delivery_threshold: 500 }) },
     $transaction:   vi.fn(),
   },
 }));
@@ -75,6 +76,7 @@ describe('Order Controller', () => {
             updateMany: vi.fn().mockResolvedValue({}),
           },
           order: { create: vi.fn() },
+          blacklistedBatch: { findFirst: vi.fn().mockResolvedValue(null) },
         };
         await cb(tx);
       });
@@ -104,6 +106,7 @@ describe('Order Controller', () => {
             updateMany: vi.fn(),
           },
           order: { create: vi.fn() },
+          blacklistedBatch: { findFirst: vi.fn().mockResolvedValue(null) },
         };
         await cb(tx);
       });
