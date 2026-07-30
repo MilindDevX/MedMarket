@@ -80,7 +80,18 @@ async function main() {
   initExpiryQueue().catch(e => console.error(e));
   scheduleNightlyExpiryJob().catch(e => console.error(e));
 
-  app.listen(PORT, () => console.log(`🚀 MedMarket API running on port ${PORT}`));
+  app.listen(PORT, () => {
+    console.log(`🚀 MedMarket API running on port ${PORT}`);
+    
+    // Keep backend warm (Render free tier sleeps after 15 mins of inactivity)
+    const backendUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://medmarket-g08v.onrender.com' 
+      : `http://localhost:${PORT}`;
+      
+    setInterval(() => {
+      fetch(`${backendUrl}/health`).catch(() => {});
+    }, 14 * 60 * 1000); // 14 minutes
+  });
 }
 
 // ── Graceful shutdown ──────────────────────────────────────────────────────

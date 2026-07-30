@@ -41,8 +41,3 @@ services:
     buildCommand: npm install -g pnpm && NODE_ENV=development pnpm install && pnpm run build
     startCommand: node dist/index.js
     healthCheckPath: /health
-  - type: cron
-    name: keep-backend-warm
-    env: node
-    schedule: "*/10 * * * *"
-    command: "curl -s https://medmarket-g08v.onrender.com/health"
