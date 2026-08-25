@@ -70,7 +70,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Dual-provider AI with automatic Groq fallback** (`src/lib/ai.ts`)
   - New `generateWithFallback(prompt, imageData?)` function — single API for all AI calls
   - Primary provider: Google Gemini 2.5 Flash (`@google/generative-ai`)
-  - Fallback provider: Groq `llama-3.3-70b-versatile` (`groq-sdk`) — activates automatically when Gemini returns `429`, `RESOURCE_EXHAUSTED`, `rate_limit`, `overloaded`, `503`, or an empty response
+  - Fallback provider: Groq `openai/gpt-oss-120b` (`groq-sdk`) — activates automatically when Gemini returns `429`, `RESOURCE_EXHAUSTED`, `rate_limit`, `overloaded`, `503`, or an empty response
   - Custom `AiUnavailableError` class with `provider` and `isQuota` fields for precise error handling
   - `src/lib/gemini.ts` converted to a lightweight legacy shim that re-exports from `ai.ts`
   - `GROQ_API_KEY` added to `.env.example`; `groq-sdk ^1.3` added to `package.json`

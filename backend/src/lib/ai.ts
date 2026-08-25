@@ -2,7 +2,7 @@
  * MedMarket — Unified AI Client
  *
  * Primary:  Google Gemini 2.5 Flash  (via @google/generative-ai)
- * Fallback: Groq  llama-3.3-70b-versatile  (via groq-sdk) — free tier
+ * Fallback: Groq  openai/gpt-oss-120b  (via groq-sdk) — free tier
  *
  * Usage:
  *   import { generateWithFallback } from '../lib/ai.ts';
@@ -158,7 +158,7 @@ export async function generateWithFallback(
         : prompt;
 
       const completion = await groq.chat.completions.create({
-        model:       'llama-3.3-70b-versatile',
+        model:       'openai/gpt-oss-120b',
         messages:    [{ role: 'user', content: groqPrompt }],
         temperature: 0.2,
         max_tokens:  1024,

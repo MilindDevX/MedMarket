@@ -82,7 +82,7 @@ The platform has three distinct portals — Consumer, Pharmacy, and Admin — ea
 | Auth | JWT (access 15 min + refresh 7 days with rotation) |
 | File storage | Cloudinary |
 | AI (primary) | Google Gemini 2.5 Flash (`@google/generative-ai`) |
-| AI (fallback) | Groq LLaMA 3.3 70B Versatile (`groq-sdk`) — auto-activates on quota/rate-limit |
+| AI (fallback) | Groq GPT-OSS 120B (`openai/gpt-oss-120b`, `groq-sdk`) — auto-activates on quota/rate-limit |
 | Build | esbuild (not tsc — see [Why esbuild](#why-esbuild)) |
 | Testing | Vitest + Supertest (38 tests) |
 
@@ -133,8 +133,8 @@ MedMarket uses a dual-provider AI architecture defined in `backend/src/lib/ai.ts
 
 | Feature | Route | Primary AI | Fallback AI |
 |---|---|---|---|
-| **AI Document Verification** | `POST /admin/applications/:id/ai-verify` | Gemini 2.5 Flash (vision) | Groq LLaMA 3.3 70B (text-only with `UNREADABLE` fallback) |
-| **AI Pharmacy Insights** | `GET /ai/pharmacy/ai-insights` | Gemini 2.5 Flash | Groq LLaMA 3.3 70B |
+| **AI Document Verification** | `POST /admin/applications/:id/ai-verify` | Gemini 2.5 Flash (vision) | Groq GPT-OSS 120B (text-only with `UNREADABLE` fallback) |
+| **AI Pharmacy Insights** | `GET /ai/pharmacy/ai-insights` | Gemini 2.5 Flash | Groq GPT-OSS 120B |
 
 ### Fallback logic
 
