@@ -1,3 +1,114 @@
+/* ── Mobile drawer ────────────────────────────────────────────────────────── */
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 99;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  background: var(--always-dark);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-5) var(--sp-3);
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-5);
+  padding-bottom: var(--sp-4);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.drawerBrand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drawerDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green-500);
+  display: block;
+  flex-shrink: 0;
+}
+
+.drawerName {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--always-white);
+}
+
+.drawerClose {
+  color: var(--always-sub);
+  padding: 4px;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  transition: color var(--duration);
+}
+.drawerClose:hover { color: var(--always-white); }
+
+.drawerLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  color: var(--always-sub);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background var(--duration), color var(--duration);
+}
+.drawerLink:hover { background: rgba(255,255,255,0.05); color: var(--always-white); }
+
+.drawerLinkActive {
+  color: var(--green-300);
+  background: rgba(12,107,78,0.25);
+}
+
+.drawerFooter {
+  margin-top: auto;
+  padding-top: var(--sp-4);
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.drawerLogout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  color: var(--always-sub);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background var(--duration), color var(--duration);
+}
+.drawerLogout:hover {
+  background: rgba(239,68,68,0.12);
+  color: #FCA5A5;
+}
+
+/* ── Existing styles below ───────────────────────────────────────────────── */
 .shell {
   display: flex;
   min-height: 100vh;

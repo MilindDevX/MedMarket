@@ -57,7 +57,7 @@
 
 .danger {
   background: var(--danger-light);
-  color: #991B1B;
+  color: var(--danger-dark);
   border: 1.5px solid #FECACA;
 }
 .danger:hover:not(:disabled) {
@@ -79,4 +79,34 @@
 }
 .outline:hover:not(:disabled) {
   background: var(--green-50);
+}
+
+/* ── Loading state ── */
+.loading {
+  /* Preserve button width so layout doesn't shift when spinner replaces text */
+  min-width: 80px;
+  pointer-events: none;
+}
+
+.btnSpinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: btnSpin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+
+/* Non-primary variants: darker spinner ring */
+.secondary .btnSpinner,
+.ghost .btnSpinner,
+.outline .btnSpinner {
+  border-color: rgba(0,0,0,0.15);
+  border-top-color: currentColor;
+}
+
+@keyframes btnSpin {
+  to { transform: rotate(360deg); }
 }

@@ -7,6 +7,7 @@
   --green-700: #0C6B4E;
   --green-600: #0F8B66;
   --green-500: #14A97D;
+  --green-400: #27C08A;   /* fills the step between 500 and 300 */
   --green-300: #5DCBA8;
   --green-200: #A8D9C8;
   --green-100: #C8EDE2;
@@ -86,6 +87,26 @@
   /* ── Transitions ── */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --duration: 0.22s;
+
+  /* ── Semantic page aliases ── */
+  /* Always use these on body/page-level backgrounds and text; never hardcode hex */
+  --bg-page:    #F1F0EA;
+  --text-primary: #1C1C1A;
+
+  /* ── Layout ── */
+  --layout-max-width: 1280px;
+
+  /* ── Typographic scale ── */
+  /* Use these everywhere instead of raw px font-size values */
+  --fs-xs:   11px;
+  --fs-sm:   12px;
+  --fs-base: 14px;
+  --fs-md:   16px;
+  --fs-lg:   18px;
+  --fs-xl:   20px;
+  --fs-2xl:  24px;
+  --fs-3xl:  30px;
+  --fs-4xl:  36px;
 }
 
 

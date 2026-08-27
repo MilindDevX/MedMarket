@@ -8,26 +8,36 @@ export default function Button({
   onClick,
   type = 'button',
   disabled = false,
+  loading = false,
   fullWidth = false,
   icon: Icon,
   iconRight,
   className = '',
   ...props
 }) {
+  const isDisabled = disabled || loading;
   return (
     <motion.button
       type={type}
-      className={`${styles.btn} ${styles[variant]} ${styles[size]} ${fullWidth ? styles.fullWidth : ''} ${className}`}
+      className={`${styles.btn} ${styles[variant]} ${styles[size]} ${fullWidth ? styles.fullWidth : ''} ${loading ? styles.loading : ''} ${className}`}
       onClick={onClick}
-      disabled={disabled}
-      whileHover={{ scale: disabled ? 1 : 1.02 }}
-      whileTap={{ scale: disabled ? 1 : 0.97 }}
+      disabled={isDisabled}
+      aria-busy={loading ? 'true' : undefined}
+      whileHover={{ scale: isDisabled ? 1 : 1.02 }}
+      whileTap={{ scale: isDisabled ? 1 : 0.97 }}
       transition={{ type: 'spring', stiffness: 400, damping: 20 }}
       {...props}
     >
-      {Icon && !iconRight && <Icon size={16} strokeWidth={2} />}
-      <span>{children}</span>
-      {Icon && iconRight && <Icon size={16} strokeWidth={2} />}
+      {loading
+        ? <span className={styles.btnSpinner} aria-hidden="true" />
+        : (
+          <>
+            {Icon && !iconRight && <Icon size={16} strokeWidth={2} />}
+            <span>{children}</span>
+            {Icon && iconRight && <Icon size={16} strokeWidth={2} />}
+          </>
+        )
+      }
     </motion.button>
   );
 }

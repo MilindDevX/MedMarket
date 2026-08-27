@@ -1,6 +1,6 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
-// UX-1: Switched from sessionStorage to localStorage so sessions survive tab close
+// ── Token storage (localStorage — survives tab close, aligns with auth) ──────
 export function getTokens() {
   return {
     accessToken:  localStorage.getItem('accessToken'),
@@ -23,23 +23,39 @@ export function saveUser(user) {
   localStorage.setItem('user', JSON.stringify(user));
 }
 
+// ── Single-flight refresh ─────────────────────────────────────────────────────
+// Multiple concurrent 401s share ONE refresh call instead of firing N parallel
+// refreshes, which would cause the second+ calls to fail (token already rotated).
+let refreshPromise = null;
+
 async function refreshAccessToken() {
+  // If a refresh is already in-flight, join it instead of starting a new one
+  if (refreshPromise) return refreshPromise;
+
   const { refreshToken } = getTokens();
   if (!refreshToken) return null;
-  try {
-    const res = await fetch(`${BASE_URL}/auth/refresh`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ refreshToken }),
-    });
-    if (!res.ok) { clearTokens(); return null; }
-    const data = await res.json();
-    saveTokens(data.data.accessToken, data.data.refreshToken);
-    return data.data.accessToken;
-  } catch {
-    clearTokens();
-    return null;
-  }
+
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ refreshToken }),
+      });
+      if (!res.ok) { clearTokens(); return null; }
+      const data = await res.json();
+      saveTokens(data.data.accessToken, data.data.refreshToken);
+      return data.data.accessToken;
+    } catch {
+      clearTokens();
+      return null;
+    }
+  })().finally(() => {
+    // Clear the in-flight promise regardless of outcome so future calls start fresh
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
 }
 
 // Auth endpoints must never trigger the 401-refresh retry — a 401 on /auth/login
@@ -67,6 +83,8 @@ async function request(endpoint, options = {}) {
     if (msg.includes('deactivat') || msg.includes('disabled') || msg.includes('inactive')) {
       throw new Error(data.message);
     }
+
+    // Single-flight refresh — all parallel 401s share one refresh call
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers['Authorization'] = `Bearer ${newToken}`;
@@ -75,7 +93,9 @@ async function request(endpoint, options = {}) {
       if (!retryRes.ok) throw new Error(retryData.message || 'Something went wrong');
       return retryData;
     } else {
-      window.dispatchEvent(new Event('auth:logout'));
+      // Carry the current path so Login.jsx can deep-link restore after re-auth
+      const from = window.location.pathname + window.location.search;
+      window.dispatchEvent(new CustomEvent('auth:logout', { detail: { from } }));
       throw new Error('Session expired. Please log in again.');
     }
   }
@@ -92,7 +112,7 @@ async function request(endpoint, options = {}) {
   return data;
 }
 
-// CQ-4: All HTTP verbs aligned — added `put` for full-resource updates
+// All HTTP verbs — put added for full-resource updates
 export const api = {
   get:    (endpoint)       => request(endpoint, { method: 'GET' }),
   post:   (endpoint, body) => request(endpoint, { method: 'POST',   body: JSON.stringify(body) }),

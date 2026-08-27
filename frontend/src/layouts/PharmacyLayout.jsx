@@ -89,45 +89,47 @@ export default function PharmacyLayout() {
           {mobileOpen && (
             <>
               <motion.div
-                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 99 }}
+                className={styles.drawerOverlay}
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 onClick={() => setMobileOpen(false)}
               />
-              <motion.div
-                style={{ position: 'fixed', top: 0, left: 0, bottom: 0, width: 260, background: 'var(--always-dark)', zIndex: 100, display: 'flex', flexDirection: 'column', padding: 'var(--sp-5) var(--sp-3)' }}
+              <motion.aside
+                className={styles.drawer}
                 initial={{ x: -260 }} animate={{ x: 0 }} exit={{ x: -260 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--sp-5)', paddingBottom: 'var(--sp-4)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green-500)', display: 'block' }} />
-                    <span style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 600, color: 'var(--always-white)' }}>MedMarket</span>
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Navigation menu"
+              >
+                <div className={styles.drawerHeader}>
+                  <div className={styles.drawerBrand}>
+                    <span className={styles.drawerDot} />
+                    <span className={styles.drawerName}>MedMarket</span>
                   </div>
-                  <button onClick={() => setMobileOpen(false)} style={{ color: 'var(--always-sub)', padding: 4, borderRadius: 6 }}>
-                    <X size={18} strokeWidth={2} />
+                  <button
+                    className={styles.drawerClose}
+                    onClick={() => setMobileOpen(false)}
+                    aria-label="Close menu"
+                    autoFocus
+                  >
+                    <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </div>
                 {navItems.map(({ to, icon: Icon, label, end }) => (
                   <NavLink key={to} to={to} end={end}
                     onClick={() => setMobileOpen(false)}
-                    style={({ isActive }) => ({
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '10px 12px', borderRadius: 8, marginBottom: 2,
-                      color: isActive ? 'var(--green-300)' : 'var(--always-sub)',
-                      background: isActive ? 'rgba(12,107,78,0.25)' : 'transparent',
-                      fontSize: 14, fontWeight: 500, textDecoration: 'none', transition: 'all 0.15s',
-                    })}>
-                    <Icon size={17} strokeWidth={1.8} />
+                    className={({ isActive }) => `${styles.drawerLink} ${isActive ? styles.drawerLinkActive : ''}`}
+                  >
+                    <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
                     {label}
                   </NavLink>
                 ))}
-                <div style={{ marginTop: 'auto', paddingTop: 'var(--sp-4)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13, color: 'var(--always-sub)', transition: 'all 0.15s', background: 'none', border: 'none', cursor: 'pointer' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)'; e.currentTarget.style.color = '#FCA5A5'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}>
-                    <LogOut size={15} strokeWidth={1.8} /> Logout
+                <div className={styles.drawerFooter}>
+                  <button onClick={handleLogout} className={styles.drawerLogout}>
+                    <LogOut size={15} strokeWidth={1.8} aria-hidden="true" /> Logout
                   </button>
                 </div>
-              </motion.div>
+              </motion.aside>
             </>
           )}
         </AnimatePresence>

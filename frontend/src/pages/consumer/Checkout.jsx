@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MapPin, CreditCard, Smartphone, Banknote,
-  CheckCircle, ArrowLeft, ArrowRight, ShieldCheck, Plus, Info, X, Check
+  CheckCircle, ArrowLeft, ArrowRight, ShieldCheck, Plus, Info, X, Check, AlertTriangle, Loader2
 } from 'lucide-react';
 import useCartStore from '../../store/cartStore';
 import useOrderStore from '../../store/orderStore';
@@ -11,6 +11,8 @@ import useToastStore from '../../store/toastStore';
 import usePageTitle from '../../utils/usePageTitle';
 import { api } from '../../utils/api';
 import { useAddresses } from '../../hooks/useAddresses';
+import { formatCurrency } from '../../utils/formatCurrency';
+import { SkeletonCard } from '../../components/ui/Skeleton';
 import styles from './Checkout.module.css';
 
 const paymentMethods = [
@@ -19,12 +21,31 @@ const paymentMethods = [
   { id: 'cod',  icon: Banknote,    label: 'Cash on Delivery',      sub: 'Pay when you receive' },
 ];
 
+// ── Card number formatter (groups of 4) ──────────────────────────────────────
+function formatCardNumber(v) {
+  return v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
+}
+
+// ── Expiry formatter (MM/YY) ──────────────────────────────────────────────────
+function formatExpiry(v) {
+  const d = v.replace(/\D/g, '').slice(0, 4);
+  if (d.length > 2) return d.slice(0, 2) + ' / ' + d.slice(2);
+  return d;
+}
+
+// ── OOS inventory ID extractor from error messages ───────────────────────────
+function extractOosIds(message) {
+  // Backend sends e.g. "Item inv_abc123 is out of stock" or lists IDs
+  const matches = [...(message || '').matchAll(/inv_[a-z0-9]+/gi)];
+  return matches.map(m => m[0]);
+}
+
 export default function Checkout() {
   const navigate = useNavigate();
-  const { items, storeName, storeId, clearCart } = useCartStore();
+  const { items, storeName, storeId, clearCart, flagUnavailable, removeUnavailable, clearFlags } = useCartStore();
   const { addOrder }  = useOrderStore();
   const toast         = useToastStore();
-  const { addresses, loading: addrLoading, add: addAddress } = useAddresses();
+  const { addresses, loading: addrLoading, error: addrError, add: addAddress } = useAddresses();
   usePageTitle('Checkout');
 
   const [step,         setStep]         = useState(1);
@@ -40,6 +61,34 @@ export default function Checkout() {
   const [countdown,    setCountdown]    = useState(5);
   const [showAddrModal, setShowAddrModal] = useState(false);
   const [addrForm, setAddrForm]         = useState({ label:'', address_line:'', city:'', pincode:'' });
+  const [addrFormErr,  setAddrFormErr]  = useState('');
+
+  // ── Inline error state for each field ────────────────────────────────────
+  const [addrError,    setAddrError]    = useState('');    // delivery address gate
+  const [upiError,     setUpiError]     = useState('');
+  const [cardNumError, setCardNumError] = useState('');
+  const [cardExpError, setCardExpError] = useState('');
+  const [cardCvvError, setCardCvvError] = useState('');
+  const [codError,     setCodError]     = useState('');
+  const [oosError,     setOosError]     = useState(false); // true when OOS items flagged
+
+  // ── Refs ──────────────────────────────────────────────────────────────────
+  const upiRef     = useRef(null);
+  const cardNumRef = useRef(null);
+  const cardExpRef = useRef(null);
+  const cardCvvRef = useRef(null);
+
+  // Reentrancy guard — prevents double-submit on double-click / fast tap
+  const orderPlacedRef = useRef(false);
+
+  // ── Idempotency key — generated once per component mount ─────────────────
+  // Regenerated only after a failed order (to allow retries).
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+
+  const resetIdempotencyKey = useCallback(() => setIdempotencyKey(crypto.randomUUID()), []);
+
+  // Derived submitting state: true while a request is in-flight
+  const submitting = loading;
 
   // Auto-select default address
   useEffect(() => {
@@ -48,6 +97,11 @@ export default function Checkout() {
       setSelectedAddr(def.id);
     }
   }, [addresses, selectedAddr]);
+
+  // Clear address error when user selects an address
+  useEffect(() => {
+    if (selectedAddr) setAddrError('');
+  }, [selectedAddr]);
 
   // Countdown redirect after order placed
   useEffect(() => {
@@ -62,35 +116,101 @@ export default function Checkout() {
   const gst         = Math.round(subtotal * 0.12);
   const total       = subtotal + deliveryFee + gst;
 
+  // ── Step 1 → 2 gate: validate address selection ──────────────────────────
+  const handleContinueToPayment = () => {
+    if (deliveryType === 'delivery' && !selectedAddr) {
+      setAddrError('Please select a delivery address to continue.');
+      return;
+    }
+    setAddrError('');
+    setStep(2);
+  };
+
+  // ── Clear all inline field errors when payment method changes ────────────
+  const handlePaymentChange = (pm) => {
+    setPayment(pm);
+    setUpiError(''); setCardNumError(''); setCardExpError('');
+    setCardCvvError(''); setCodError('');
+  };
+
   const handlePlaceOrder = async () => {
+    // Reentrancy guard: block double-submit
+    if (orderPlacedRef.current || submitting) return;
+
+    // ── Inline validation with focus ──────────────────────────────────────
+    let hasError = false;
+
     if (payment === 'upi') {
-      if (!upiId.trim()) { toast.error('Please enter your UPI ID.'); return; }
-      if (!/^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/.test(upiId.trim())) { toast.error('Invalid UPI ID format (e.g. name@upi).'); return; }
+      if (!upiId.trim()) {
+        setUpiError('UPI ID is required.');
+        upiRef.current?.focus();
+        hasError = true;
+      } else if (!/^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/.test(upiId.trim())) {
+        setUpiError('Invalid UPI ID — use the format name@upi');
+        upiRef.current?.focus();
+        hasError = true;
+      } else {
+        setUpiError('');
+      }
     }
+
     if (payment === 'card') {
-      if (!cardNumber.replace(/\s/g,'').match(/^\d{16}$/)) { toast.error('Enter a valid 16-digit card number.'); return; }
-      if (!cardExpiry.match(/^\d{2}\s*\/\s*\d{2}$/)) { toast.error('Enter card expiry as MM / YY.'); return; }
-      if (!cardCvv.match(/^\d{3}$/)) { toast.error('Enter a valid 3-digit CVV.'); return; }
+      const rawCard = cardNumber.replace(/\s/g, '');
+      if (!rawCard.match(/^\d{16}$/)) {
+        setCardNumError('Enter a valid 16-digit card number.');
+        if (!hasError) cardNumRef.current?.focus();
+        hasError = true;
+      } else {
+        setCardNumError('');
+      }
+
+      if (!cardExpiry.replace(/\s/g, '').match(/^\d{2}\/\d{2}$/)) {
+        setCardExpError('Enter expiry as MM / YY.');
+        if (!hasError) cardExpRef.current?.focus();
+        hasError = true;
+      } else {
+        setCardExpError('');
+      }
+
+      if (!cardCvv.match(/^\d{3}$/)) {
+        setCardCvvError('Enter a valid 3-digit CVV.');
+        if (!hasError) cardCvvRef.current?.focus();
+        hasError = true;
+      } else {
+        setCardCvvError('');
+      }
     }
-    if (total > 2000 && payment === 'cod') {
-      toast.error('COD is not available for orders above ₹2,000. Please choose UPI or Card.'); return;
+
+    if (payment === 'cod' && total > 2000) {
+      setCodError('COD is not available for orders above ₹2,000. Please choose UPI or Card.');
+      hasError = true;
+    } else {
+      setCodError('');
     }
+
+    if (hasError) return;
 
     // Validate items have real inventoryId (set when adding from StoreProfile)
     const invalidItems = items.filter(i => !i.inventoryId || i.storeId === 'direct');
     if (invalidItems.length > 0 || !storeId || storeId === 'direct') {
-      // Navigate to stores with a helpful state message instead of blocking error
-      navigate('/consumer/stores', { state: { message: 'Please choose a pharmacy and add medicines from its store page to place an order.' } });
+      navigate('/consumer/stores', {
+        state: { message: 'Please choose a pharmacy and add medicines from its store page to place an order.' },
+      });
       return;
     }
 
+    // ── Mark in-flight ──────────────────────────────────────────────────────
+    orderPlacedRef.current = true;
     setLoading(true);
+    setOosError(false);
+
     try {
       const addr = addresses.find(a => a.id === selectedAddr);
       const res = await api.post('/orders', {
         store_id:         storeId,
         delivery_type:    deliveryType,
         payment_method:   payment,
+        idempotency_key:  idempotencyKey,
         delivery_address: addr ? `${addr.address_line}, ${addr.city} — ${addr.pincode}` : '',
         items: items.map(i => ({
           inventory_id: i.inventoryId,
@@ -102,7 +222,26 @@ export default function Checkout() {
       setPlacedOrderId(res.data.id);
       setStep(3);
     } catch (err) {
-      toast.error(err.message || 'Failed to place order. Please try again.');
+      // ── OOS detection ──────────────────────────────────────────────────
+      const msg = err.message || '';
+      const isOos = /out of stock|insufficient stock|unavailable|not enough/i.test(msg);
+
+      if (isOos) {
+        const oosIds = extractOosIds(msg);
+        if (oosIds.length > 0) {
+          flagUnavailable(oosIds);
+        } else {
+          // Can't parse specific IDs — flag all items as suspect (conservative)
+          flagUnavailable(items.map(i => i.inventoryId).filter(Boolean));
+        }
+        setOosError(true);
+      } else {
+        toast.error(msg || 'Failed to place order. Please try again.');
+      }
+
+      // Reset guard and generate fresh idempotency key so user can retry
+      orderPlacedRef.current = false;
+      resetIdempotencyKey();
     } finally {
       setLoading(false);
     }
@@ -110,8 +249,10 @@ export default function Checkout() {
 
   const handleAddAddress = async () => {
     if (!addrForm.label || !addrForm.address_line || !addrForm.city || !addrForm.pincode) {
-      toast.error('Please fill all address fields.'); return;
+      setAddrFormErr('Please fill all address fields.');
+      return;
     }
+    setAddrFormErr('');
     try {
       await addAddress(addrForm);
       setShowAddrModal(false);
@@ -120,7 +261,7 @@ export default function Checkout() {
     } catch (err) { toast.error(err.message); }
   };
 
-  // ── Order confirmed screen ───────────────────────────────────────────────────
+  // ── Order confirmed screen ─────────────────────────────────────────────────
   if (step === 3) {
     return (
       <div className={styles.confirmPage}>
@@ -157,10 +298,18 @@ export default function Checkout() {
     );
   }
 
+  const hasUnavailableItems = items.some(i => i._unavailable);
+
   return (
     <div className={styles.page}>
       <div className={styles.inner}>
-        <button className={styles.backBtn} onClick={() => step === 1 ? navigate('/consumer/cart') : setStep(1)}>
+        {/* Back button — disabled while a request is in-flight */}
+        <button
+          className={styles.backBtn}
+          onClick={() => step === 1 ? navigate('/consumer/cart') : setStep(1)}
+          disabled={submitting}
+          aria-disabled={submitting}
+        >
           <ArrowLeft size={15} strokeWidth={2} /> {step === 1 ? 'Back to Cart' : 'Back to Address'}
         </button>
 
@@ -176,6 +325,29 @@ export default function Checkout() {
             </div>
           ))}
         </div>
+
+        {/* OOS Banner — shown when backend flags unavailable items */}
+        <AnimatePresence>
+          {oosError && hasUnavailableItems && (
+            <motion.div
+              className={styles.oosBanner}
+              initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
+              role="alert"
+            >
+              <AlertTriangle size={16} strokeWidth={2} aria-hidden="true" />
+              <div className={styles.oosBannerText}>
+                <strong>Some items are out of stock.</strong>
+                {' '}The pharmacy can't fulfil all your items. Remove unavailable items to proceed.
+              </div>
+              <button
+                className={styles.oosRemoveBtn}
+                onClick={() => { removeUnavailable(); setOosError(false); clearFlags(); }}
+              >
+                Remove unavailable
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className={styles.layout}>
           <div className={styles.formCol}>
@@ -196,7 +368,7 @@ export default function Checkout() {
                       ].map(dt => (
                         <button key={dt.id}
                           className={`${styles.dtCard} ${deliveryType === dt.id ? styles.dtCardActive : ''}`}
-                          onClick={() => setDeliveryType(dt.id)}>
+                          onClick={() => { setDeliveryType(dt.id); setAddrError(''); }}>
                           <div className={styles.dtLabel}>{dt.label}</div>
                           <div className={styles.dtSub}>{dt.sub}</div>
                         </button>
@@ -208,7 +380,12 @@ export default function Checkout() {
                     <div className={styles.section}>
                       <h2 className={styles.sectionTitle}>Delivery address</h2>
                       {addrLoading ? (
-                        <p style={{ fontSize:14, color:'var(--ink-400)' }}>Loading addresses…</p>
+                        <SkeletonCard lines={3} />
+                      ) : addrError ? (
+                        <p className={styles.hookError}>
+                          <AlertTriangle size={14} strokeWidth={2} aria-hidden="true" />
+                          Couldn't load addresses. Please refresh.
+                        </p>
                       ) : (
                         <div className={styles.addressList}>
                           {addresses.map(addr => (
@@ -230,10 +407,16 @@ export default function Checkout() {
                           </button>
                         </div>
                       )}
+                      {/* Inline address gate error */}
+                      {addrError && (
+                        <p className={styles.fieldError} role="alert">
+                          <AlertTriangle size={13} strokeWidth={2} aria-hidden="true" /> {addrError}
+                        </p>
+                      )}
                     </div>
                   )}
 
-                  <button className={styles.nextBtn} onClick={() => setStep(2)}>
+                  <button className={styles.nextBtn} onClick={handleContinueToPayment}>
                     Continue to Payment <ArrowRight size={16} strokeWidth={2} />
                   </button>
                 </motion.div>
@@ -251,7 +434,7 @@ export default function Checkout() {
                       {paymentMethods.map(pm => (
                         <button key={pm.id}
                           className={`${styles.pmCard} ${payment === pm.id ? styles.pmCardActive : ''}`}
-                          onClick={() => setPayment(pm.id)}>
+                          onClick={() => handlePaymentChange(pm.id)}>
                           <div className={`${styles.pmIcon} ${payment === pm.id ? styles.pmIconActive : ''}`}>
                             <pm.icon size={18} strokeWidth={1.8} />
                           </div>
@@ -270,43 +453,104 @@ export default function Checkout() {
                       {payment === 'upi' && (
                         <motion.div className={styles.upiInput}
                           initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}>
-                          <label className={styles.inputLabel}>UPI ID</label>
-                          <input className={styles.input} placeholder="yourname@upi" value={upiId} onChange={e => setUpiId(e.target.value)} />
+                          <label className={styles.inputLabel} htmlFor="upi-id">UPI ID</label>
+                          <input
+                            id="upi-id"
+                            ref={upiRef}
+                            className={`${styles.input} ${upiError ? styles.inputError : ''}`}
+                            placeholder="yourname@upi"
+                            value={upiId}
+                            onChange={e => { setUpiId(e.target.value); if (upiError) setUpiError(''); }}
+                            aria-describedby={upiError ? 'upi-err' : undefined}
+                            aria-invalid={upiError ? 'true' : undefined}
+                          />
+                          {upiError && <p id="upi-err" className={styles.fieldError} role="alert"><AlertTriangle size={13} strokeWidth={2} aria-hidden="true" /> {upiError}</p>}
                         </motion.div>
                       )}
+
                       {payment === 'card' && (
                         <motion.div style={{ display:'flex', flexDirection:'column', gap:'var(--sp-3)', marginTop:'var(--sp-3)' }}
                           initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}>
                           <div>
-                            <label className={styles.inputLabel}>Card Number</label>
-                            <input className={styles.input} placeholder="1234 5678 9012 3456" value={cardNumber} onChange={e => setCardNumber(e.target.value)} maxLength={19} />
+                            <label className={styles.inputLabel} htmlFor="card-num">Card Number</label>
+                            <input
+                              id="card-num"
+                              ref={cardNumRef}
+                              className={`${styles.input} ${cardNumError ? styles.inputError : ''}`}
+                              placeholder="1234 5678 9012 3456"
+                              value={cardNumber}
+                              onChange={e => { setCardNumber(formatCardNumber(e.target.value)); if (cardNumError) setCardNumError(''); }}
+                              inputMode="numeric"
+                              maxLength={19}
+                              aria-describedby={cardNumError ? 'card-num-err' : undefined}
+                              aria-invalid={cardNumError ? 'true' : undefined}
+                            />
+                            {cardNumError && <p id="card-num-err" className={styles.fieldError} role="alert"><AlertTriangle size={13} strokeWidth={2} aria-hidden="true" /> {cardNumError}</p>}
                           </div>
                           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--sp-3)' }}>
                             <div>
-                              <label className={styles.inputLabel}>Expiry</label>
-                              <input className={styles.input} placeholder="MM / YY" value={cardExpiry} onChange={e => setCardExpiry(e.target.value)} maxLength={7} />
+                              <label className={styles.inputLabel} htmlFor="card-exp">Expiry</label>
+                              <input
+                                id="card-exp"
+                                ref={cardExpRef}
+                                className={`${styles.input} ${cardExpError ? styles.inputError : ''}`}
+                                placeholder="MM / YY"
+                                value={cardExpiry}
+                                onChange={e => { setCardExpiry(formatExpiry(e.target.value)); if (cardExpError) setCardExpError(''); }}
+                                inputMode="numeric"
+                                maxLength={7}
+                                aria-describedby={cardExpError ? 'card-exp-err' : undefined}
+                                aria-invalid={cardExpError ? 'true' : undefined}
+                              />
+                              {cardExpError && <p id="card-exp-err" className={styles.fieldError} role="alert"><AlertTriangle size={13} strokeWidth={2} aria-hidden="true" /> {cardExpError}</p>}
                             </div>
                             <div>
-                              <label className={styles.inputLabel}>CVV</label>
-                              <input className={styles.input} placeholder="•••" type="password" value={cardCvv} onChange={e => setCardCvv(e.target.value)} maxLength={3} />
+                              <label className={styles.inputLabel} htmlFor="card-cvv">CVV</label>
+                              <input
+                                id="card-cvv"
+                                ref={cardCvvRef}
+                                className={`${styles.input} ${cardCvvError ? styles.inputError : ''}`}
+                                placeholder="•••"
+                                type="password"
+                                value={cardCvv}
+                                onChange={e => { setCardCvv(e.target.value.replace(/\D/g,'').slice(0,3)); if (cardCvvError) setCardCvvError(''); }}
+                                inputMode="numeric"
+                                maxLength={3}
+                                aria-describedby={cardCvvError ? 'card-cvv-err' : undefined}
+                                aria-invalid={cardCvvError ? 'true' : undefined}
+                              />
+                              {cardCvvError && <p id="card-cvv-err" className={styles.fieldError} role="alert"><AlertTriangle size={13} strokeWidth={2} aria-hidden="true" /> {cardCvvError}</p>}
                             </div>
                           </div>
                         </motion.div>
                       )}
+
                       {payment === 'cod' && (
-                        <motion.div style={{ display:'flex', alignItems:'flex-start', gap:'var(--sp-2)', background:'var(--warning-light)', border:'1px solid #FDE68A', borderRadius:'var(--r-md)', padding:'var(--sp-3) var(--sp-4)', marginTop:'var(--sp-3)', fontSize:13, color:'#92400E', lineHeight:1.5 }}
+                        <motion.div
+                          style={{ display:'flex', alignItems:'flex-start', gap:'var(--sp-2)', background:'var(--warning-light)', border:'1px solid #FDE68A', borderRadius:'var(--r-md)', padding:'var(--sp-3) var(--sp-4)', marginTop:'var(--sp-3)', fontSize:13, color:'var(--warning-dark)', lineHeight:1.5 }}
                           initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}>
-                          <Info size={14} strokeWidth={2} style={{ flexShrink:0, marginTop:1 }} />
+                          <Info size={14} strokeWidth={2} style={{ flexShrink:0, marginTop:1 }} aria-hidden="true" />
                           <span>Please keep exact change ready. COD orders above ₹2,000 are not accepted. A delivery fee of ₹30 applies for orders below ₹200.</span>
                         </motion.div>
+                      )}
+
+                      {codError && (
+                        <p className={styles.fieldError} role="alert" style={{ marginTop:'var(--sp-2)' }}>
+                          <AlertTriangle size={13} strokeWidth={2} aria-hidden="true" /> {codError}
+                        </p>
                       )}
                     </AnimatePresence>
                   </div>
 
-                  <button className={styles.nextBtn} onClick={handlePlaceOrder} disabled={loading}>
-                    {loading
-                      ? <span className={styles.spinner} />
-                      : <><ShieldCheck size={16} strokeWidth={2} /> Place Order — ₹{total}</>}
+                  <button
+                    className={styles.nextBtn}
+                    onClick={handlePlaceOrder}
+                    disabled={submitting}
+                    aria-busy={submitting}
+                  >
+                    {submitting
+                      ? <><Loader2 size={18} className={styles.spinnerIcon} aria-hidden="true" /> Processing…</>
+                      : <><ShieldCheck size={16} strokeWidth={2} /> Place Order — {formatCurrency(total)}</>}
                   </button>
                   <p className={styles.secureNote}>Your payment is encrypted and secure. GST invoice will be emailed on confirmation.</p>
                 </motion.div>
@@ -320,25 +564,31 @@ export default function Checkout() {
             <div className={styles.summaryTitle}>Order from {storeName || 'Pharmacy'}</div>
             <div className={styles.summaryItems}>
               {items.map(item => (
-                <div key={item._key || item.medicineId} className={styles.summaryItem}>
-                  <span>{item.medicineName} × {item.qty}</span>
-                  <span>₹{item.price * item.qty}</span>
+                <div
+                  key={item._key || item.medicineId}
+                  className={`${styles.summaryItem} ${item._unavailable ? styles.summaryItemOos : ''}`}
+                >
+                  <span>
+                    {item._unavailable && <AlertTriangle size={12} strokeWidth={2} style={{ marginRight:4, color:'var(--warning)' }} aria-label="Out of stock" />}
+                    {item.medicineName} × {item.qty}
+                  </span>
+                  <span>{formatCurrency(item.price * item.qty)}</span>
                 </div>
               ))}
             </div>
             <div className={styles.summaryBreak}>
               {[
-                { label:'Subtotal',  val:`₹${subtotal}` },
-                { label:'Delivery',  val: deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`, green: deliveryFee === 0 },
-                { label:'GST (12%)', val:`₹${gst}` },
+                { label:'Subtotal',  val: formatCurrency(subtotal) },
+                { label:'Delivery',  val: deliveryFee === 0 ? 'FREE' : formatCurrency(deliveryFee), green: deliveryFee === 0 },
+                { label:'GST (12%)', val: formatCurrency(gst) },
               ].map(({ label, val, green }) => (
                 <div key={label} className={styles.breakLine}>
                   <span>{label}</span>
-                  <span style={{ color: green ? 'var(--success)' : undefined, fontWeight: green ? 700 : undefined }}>{val}</span>
+                  <span style={{ color: green ? 'var(--success-dark)' : undefined, fontWeight: green ? 700 : undefined }}>{val}</span>
                 </div>
               ))}
             </div>
-            <div className={styles.totalRow}><span>Total</span><span>₹{total}</span></div>
+            <div className={styles.totalRow}><span>Total</span><span>{formatCurrency(total)}</span></div>
           </div>
         </div>
       </div>
@@ -346,38 +596,55 @@ export default function Checkout() {
       {/* Add Address Modal */}
       <AnimatePresence>
         {showAddrModal && (
-          <motion.div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', padding:'var(--sp-5)' }}
+          <motion.div
+            style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', padding:'var(--sp-5)' }}
             initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-            onClick={() => setShowAddrModal(false)}>
-            <motion.div style={{ background:'#FFFFFF', borderRadius:20, width:'100%', maxWidth:440, boxShadow:'var(--shadow-lg)', overflow:'hidden' }}
+            onClick={() => setShowAddrModal(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="addr-modal-title"
+          >
+            <motion.div
+              style={{ background:'#FFFFFF', borderRadius:20, width:'100%', maxWidth:440, boxShadow:'var(--shadow-lg)', overflow:'hidden' }}
               initial={{ scale:0.93, y:20, opacity:0 }} animate={{ scale:1, y:0, opacity:1 }}
               exit={{ scale:0.93, opacity:0 }} transition={{ type:'spring', stiffness:320, damping:26 }}
-              onClick={e => e.stopPropagation()}>
+              onClick={e => e.stopPropagation()}
+            >
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'var(--sp-4) var(--sp-5)', borderBottom:'1px solid #E5E7EB' }}>
-                <h3 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:600, color:'var(--ink-900)' }}>Add New Address</h3>
-                <button onClick={() => setShowAddrModal(false)} style={{ display:'flex', padding:4, color:'var(--ink-400)', borderRadius:6 }}><X size={18} /></button>
+                <h3 id="addr-modal-title" style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:600, color:'var(--ink-900)' }}>Add New Address</h3>
+                <button onClick={() => setShowAddrModal(false)} style={{ display:'flex', padding:4, color:'var(--ink-400)', borderRadius:6 }} aria-label="Close dialog"><X size={18} aria-hidden="true" /></button>
               </div>
               <div style={{ padding:'var(--sp-5)', display:'flex', flexDirection:'column', gap:'var(--sp-4)' }}>
+                {addrFormErr && (
+                  <p style={{ fontSize:13, color:'var(--danger-dark)', display:'flex', alignItems:'center', gap:6 }} role="alert">
+                    <AlertTriangle size={13} strokeWidth={2} aria-hidden="true" /> {addrFormErr}
+                  </p>
+                )}
                 {[
                   { label:'Label (e.g. Home, Work)', key:'label',       placeholder:'Home' },
                   { label:'Full Address',             key:'address_line', placeholder:'Street, Landmark' },
                   { label:'City',                     key:'city',        placeholder:'Sonipat' },
-                  { label:'PIN Code',                 key:'pincode',     placeholder:'131001' },
-                ].map(({ label, key, placeholder }) => (
+                  { label:'PIN Code',                 key:'pincode',     placeholder:'131001', inputMode:'numeric' },
+                ].map(({ label, key, placeholder, inputMode }) => (
                   <div key={key}>
-                    <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }}>{label}</label>
-                    <input value={addrForm[key]} onChange={e => setAddrForm(f => ({ ...f, [key]: e.target.value }))}
+                    <label style={{ fontSize:12, fontWeight:600, color:'var(--ink-700)', display:'block', marginBottom:6 }} htmlFor={`addr-${key}`}>{label}</label>
+                    <input
+                      id={`addr-${key}`}
+                      value={addrForm[key]}
+                      onChange={e => setAddrForm(f => ({ ...f, [key]: e.target.value }))}
                       placeholder={placeholder}
+                      inputMode={inputMode}
                       style={{ width:'100%', height:42, padding:'0 12px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:14, fontFamily:'var(--font-body)', outline:'none', color:'var(--ink-900)', boxSizing:'border-box' }}
                       onFocus={e => e.target.style.borderColor='var(--green-700)'}
-                      onBlur={e => e.target.style.borderColor='#E5E7EB'} />
+                      onBlur={e => e.target.style.borderColor='#E5E7EB'}
+                    />
                   </div>
                 ))}
               </div>
               <div style={{ display:'flex', gap:'var(--sp-3)', padding:'var(--sp-4) var(--sp-5)', borderTop:'1px solid #E5E7EB' }}>
                 <button onClick={() => setShowAddrModal(false)} style={{ flex:1, padding:10, background:'#FFFFFF', color:'var(--ink-700)', border:'1px solid #E5E7EB', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>Cancel</button>
                 <button onClick={handleAddAddress} style={{ flex:1, padding:10, background:'var(--green-700)', color:'#FFFFFF', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                  <Check size={15} strokeWidth={2.5} /> Add Address
+                  <Check size={15} strokeWidth={2.5} aria-hidden="true" /> Add Address
                 </button>
               </div>
             </motion.div>

@@ -117,12 +117,22 @@ async function main() {
   const admin = await prisma.user.create({ data: { name:'Admin', email:'admin@medmarket.in', mobile:'+919000000000', password_hash: await hash('Admin@1234'), role:'admin', created_at: daysAgo(365) } });
 
   console.log('👤 Generating 150 consumers...');
-  const consumerDatas = Array.from({length: 150}).map((_, i) => ({
-    name: `Consumer ${i}`, email: `consumer${i}@gmail.com`, mobile: `+919900${i.toString().padStart(6, '0')}`,
-    password_hash: '$2a$10$X...', role: 'consumer' as const, created_at: randomDateWithinLast(180)
-  }));
-  await prisma.user.createMany({ data: consumerDatas });
-  const allConsumers = await prisma.user.findMany({ where: { role: 'consumer' } });
+  // Use individual creates (not createMany) because bcrypt hash() is async
+  const consumerPw = await hash('Consumer@1234');
+  const allConsumers = await Promise.all(
+    Array.from({ length: 150 }).map((_, i) =>
+      prisma.user.create({
+        data: {
+          name: `Consumer ${i}`,
+          email: `consumer${i}@gmail.com`,
+          mobile: `+919900${i.toString().padStart(6, '0')}`,
+          password_hash: consumerPw,
+          role: 'consumer' as const,
+          created_at: randomDateWithinLast(180),
+        },
+      })
+    )
+  );
 
   console.log('🏪 Generating pharmacies across 20 cities...');
   const storeOwners = await Promise.all(CITIES.map(async (city, i) => {
@@ -146,6 +156,23 @@ async function main() {
       });
       createdStores.push(store);
       await prisma.bankAccount.create({ data: { store_id: store.id, bank_name: 'HDFC Bank', account_holder: owner.name, account_number_encrypted: 'enc_acc_123', ifsc_code: 'HDFC0001234', is_verified: true }});
+      // Add required documents so admin document-viewer / approval flow is testable
+      await prisma.storeDocument.createMany({
+        data: [
+          {
+            store_id: store.id,
+            document_type: 'drug_license',
+            file_url: `https://res.cloudinary.com/demo/raw/upload/dl_${store.id}.pdf`,
+            uploaded_at: new Date(),
+          },
+          {
+            store_id: store.id,
+            document_type: 'gst_certificate',
+            file_url: `https://res.cloudinary.com/demo/raw/upload/gst_${store.id}.pdf`,
+            uploaded_at: new Date(),
+          },
+        ],
+      });
     }
   }
 

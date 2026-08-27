@@ -1,0 +1,64 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-6);
+  text-align: center;
+}
+
+.icon {
+  color: var(--warning);
+  flex-shrink: 0;
+}
+
+.msg {
+  font-size: var(--fs-base);
+  color: var(--ink-600);
+  line-height: 1.55;
+  max-width: 340px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--ink-100);
+  color: var(--ink-700);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: background var(--duration), border-color var(--duration);
+}
+.btn:hover {
+  background: var(--ink-200);
+  border-color: var(--ink-300);
+}
+
+/* Compact variant — used inline inside cards or sections */
+.compact {
+  flex-direction: row;
+  padding: var(--sp-3) var(--sp-4);
+  text-align: left;
+  background: var(--warning-light);
+  border: 1px solid #FDE68A;
+  border-radius: var(--r-md);
+  gap: var(--sp-2);
+}
+.compact .msg {
+  font-size: var(--fs-sm);
+  color: var(--warning-dark);
+}
+.compact .btn {
+  padding: 5px 10px;
+  background: var(--warning-dark);
+  color: var(--always-white);
+  border: none;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.compact .btn:hover { opacity: 0.88; background: var(--warning-dark); }

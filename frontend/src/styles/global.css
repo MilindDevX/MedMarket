@@ -37,8 +37,8 @@ body {
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.6;
-  color: #1C1C1A;
-  background: #F1F0EA;
+  color: var(--text-primary);
+  background: var(--bg-page);
 }
 
 a {
@@ -87,4 +87,20 @@ img, svg {
 @keyframes shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* ── Respect user motion preferences (WCAG 2.3.3) ── */
+@media (prefers-reduced-motion: reduce) {
+  /* Kill CSS transitions and animations for users who requested minimal motion */
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Specifically disable shimmer shimmer so skeletons just show a flat colour */
+  .shimmer, [class*='shimmer'] {
+    animation: none !important;
+    background: var(--ink-100) !important;
+  }
 }

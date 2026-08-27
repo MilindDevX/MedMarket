@@ -1,8 +1,8 @@
 import usePageTitle from '../../utils/usePageTitle';
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Store, Shield, ArrowRight, Eye, EyeOff, Phone, Mail, CheckCircle2 } from 'lucide-react';
+import { User, Store, Shield, ArrowRight, Eye, EyeOff, Phone, Mail, CheckCircle2, AlertTriangle } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import GoogleSignInButton from '../../components/ui/GoogleSignInButton';
 import styles from './Login.module.css';
@@ -26,6 +26,10 @@ export default function Login() {
 
   const { login, googleLogin } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Session-expiry flag — set by auth:navigate-login event from authStore
+  const sessionExpired = location.state?.sessionExpired === true;
 
   const handleRoleSelect = (roleId) => {
     setSelectedRole(roleId);
@@ -36,15 +40,35 @@ export default function Login() {
   };
 
   const doNavigate = (user) => {
-    if (user.role === 'consumer') navigate('/consumer/home');
-    else if (user.role === 'pharmacy_owner') {
+    // Deep-link restore: if the user was redirected here from a protected route
+    // (or after session expiry), send them back to that route after login.
+    const from = location.state?.from;
+    const safeTo = from && from !== '/login' && !from.startsWith('/login') ? from : null;
+
+    if (user.role === 'consumer') {
+      navigate(safeTo || '/consumer/home', { replace: true });
+    } else if (user.role === 'pharmacy_owner') {
       const status = useAuthStore.getState().pharmacyStatus;
-      if (status === 'pending' || status === 'rejected') navigate('/pharmacy/pending');
-      else if (status === 'suspended') navigate('/pharmacy/suspended');
-      else if (!status) navigate('/pharmacy/register');
-      else navigate('/pharmacy/dashboard');
-    } else navigate('/admin/dashboard');
+      if (status === 'pending' || status === 'rejected') navigate('/pharmacy/pending', { replace: true });
+      else if (status === 'suspended') navigate('/pharmacy/suspended', { replace: true });
+      else if (!status) navigate('/pharmacy/register', { replace: true });
+      else navigate(safeTo || '/pharmacy/dashboard', { replace: true });
+    } else {
+      navigate(safeTo || '/admin/dashboard', { replace: true });
+    }
   };
+
+  // Listen for forced-logout navigation events dispatched by authStore
+  useEffect(() => {
+    const handler = (e) => {
+      navigate('/login', {
+        replace: true,
+        state: { from: e.detail?.from || null, sessionExpired: true },
+      });
+    };
+    window.addEventListener('auth:navigate-login', handler);
+    return () => window.removeEventListener('auth:navigate-login', handler);
+  }, [navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -120,6 +144,19 @@ export default function Login() {
               Create a free account →
             </Link>
           </p>
+
+          {/* Session-expiry banner */}
+          <AnimatePresence>
+            {sessionExpired && (
+              <motion.div
+                initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
+                style={{ display:'flex', alignItems:'flex-start', gap:10, background:'#FFFBEB', border:'1.5px solid #FDE68A', borderRadius:10, padding:'12px 14px', marginBottom:'var(--sp-4)', fontSize:13, color:'#92400E', lineHeight:1.5 }}
+              >
+                <AlertTriangle size={15} strokeWidth={2} style={{ flexShrink:0, marginTop:1 }} />
+                <span><strong>Your session expired</strong> — please sign in again to continue.</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className={styles.roleGrid}>
             {roles.map(({ id, icon:Icon, label, sub, color }) => (

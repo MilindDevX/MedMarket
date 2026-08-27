@@ -15,6 +15,7 @@ const useAuthStore = create((set, get) => ({
   isAuthenticated: false,
   pharmacyStatus:  null,
   loading:         false,
+  hydrating:       true,   // true until hydrate() resolves — prevents flash-of-unauthenticated
   error:           null,
 
   _fetchPharmacyStatus: async () => {
@@ -103,27 +104,82 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  hydrate: () => {
-    const { accessToken } = getTokens();
+  // ── Async hydrate ─────────────────────────────────────────────────────────
+  // On page load we check the stored access token. If it's expired but a
+  // refresh token is present, we proactively refresh before rendering the app.
+  // This eliminates the "logged-out flash" on hard refresh.
+  hydrate: async () => {
+    const { accessToken, refreshToken } = getTokens();
     const stored = localStorage.getItem('user');
+
+    // Nothing stored — user was never logged in
+    if (!accessToken && !refreshToken) {
+      set({ hydrating: false });
+      return;
+    }
+
     if (accessToken && stored) {
       try {
-        // UX-2: Validate JWT expiry on hydrate to prevent stale sessions
         const payload = JSON.parse(atob(accessToken.split('.')[1]));
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
-          // Token expired — clear everything
-          clearTokens();
+        const isExpired = payload.exp && payload.exp * 1000 < Date.now();
+
+        if (!isExpired) {
+          // Token is still valid — restore session immediately
+          const user = JSON.parse(stored);
+          set({ user, role: user.role, isAuthenticated: true, pharmacyStatus: user.pharmacyStatus || null, hydrating: false });
+          // Refresh pharmacy status in background — don't block render
+          if (user.role === 'pharmacy_owner') setTimeout(() => get()._fetchPharmacyStatus(), 100);
           return;
         }
-
-        const user = JSON.parse(stored);
-        set({ user, role: user.role, isAuthenticated: true, pharmacyStatus: user.pharmacyStatus || null });
-        if (user.role === 'pharmacy_owner') setTimeout(() => get()._fetchPharmacyStatus(), 100);
-      } catch { clearTokens(); }
+      } catch {
+        // Malformed token — fall through to refresh attempt
+      }
     }
+
+    // Access token is expired (or missing) — try refresh before giving up
+    if (refreshToken) {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/auth/refresh`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ refreshToken }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const { saveTokens: save, saveUser: saveU } = await import('../utils/api');
+          save(data.data.accessToken, data.data.refreshToken);
+          // Fetch fresh user profile with the new token
+          const profileRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/auth/me`, {
+            headers: { Authorization: `Bearer ${data.data.accessToken}` },
+          });
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            const user = profile.data || profile;
+            saveU(user);
+            set({ user, role: user.role, isAuthenticated: true, pharmacyStatus: user.pharmacyStatus || null, hydrating: false });
+            if (user.role === 'pharmacy_owner') setTimeout(() => get()._fetchPharmacyStatus(), 100);
+            return;
+          }
+        }
+      } catch {
+        // Refresh failed — fall through to clear
+      }
+    }
+
+    // All attempts failed — clear stale tokens silently
+    clearTokens();
+    set({ hydrating: false });
   },
 }));
 
-window.addEventListener('auth:logout', () => { useAuthStore.getState().logout(); });
+// ── Global auth:logout listener ───────────────────────────────────────────────
+// Dispatched by api.js when refresh fails. Carries { from } for deep-link restore.
+window.addEventListener('auth:logout', async (e) => {
+  const from = e.detail?.from || null;
+  await useAuthStore.getState().logout();
+  // Navigate to login with session-expiry flag and the originating path
+  // Using a CustomEvent re-dispatch so Login.jsx can read location.state via router
+  window.dispatchEvent(new CustomEvent('auth:navigate-login', { detail: { from, sessionExpired: true } }));
+});
 
 export default useAuthStore;
