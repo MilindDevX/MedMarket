@@ -45,7 +45,7 @@ export default function Checkout() {
   const { items, storeName, storeId, clearCart, flagUnavailable, removeUnavailable, clearFlags } = useCartStore();
   const { addOrder }  = useOrderStore();
   const toast         = useToastStore();
-  const { addresses, loading: addrLoading, error: addrError, add: addAddress } = useAddresses();
+  const { addresses, loading: addrLoading, error: addrLoadError, add: addAddress } = useAddresses();
   usePageTitle('Checkout');
 
   const [step,         setStep]         = useState(1);
@@ -381,7 +381,7 @@ export default function Checkout() {
                       <h2 className={styles.sectionTitle}>Delivery address</h2>
                       {addrLoading ? (
                         <SkeletonCard lines={3} />
-                      ) : addrError ? (
+                      ) : addrLoadError ? (
                         <p className={styles.hookError}>
                           <AlertTriangle size={14} strokeWidth={2} aria-hidden="true" />
                           Couldn't load addresses. Please refresh.
