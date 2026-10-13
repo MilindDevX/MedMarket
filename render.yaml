@@ -10,7 +10,7 @@ services:
       - key: DATABASE_URL
         sync: false          # set in Render dashboard
       # ── Auth ──────────────────────────────────────────────────────────────
-      - key: JWT_SECRET
+      - key: JWT_ACCESS_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
         sync: false

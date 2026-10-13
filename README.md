@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/MilindDevX/MedMarket/actions/workflows/ci.yml/badge.svg)](https://github.com/MilindDevX/MedMarket/actions/workflows/ci.yml)
 [![Backend Tests](https://img.shields.io/badge/backend%20tests-38%20passing-brightgreen)](https://github.com/MilindDevX/MedMarket/actions)
-[![Frontend Tests](https://img.shields.io/badge/frontend%20tests-20%20passing-brightgreen)](https://github.com/MilindDevX/MedMarket/actions)
+[![Frontend Tests](https://img.shields.io/badge/frontend%20tests-23%20passing-brightgreen)](https://github.com/MilindDevX/MedMarket/actions)
 [![API Docs](https://img.shields.io/badge/API%20docs-Swagger%20UI-85EA2D?logo=swagger)](https://medmarket-g08v.onrender.com/api/docs)
 [![License](https://img.shields.io/badge/license-ISC-blue)](./LICENSE)
 
@@ -74,7 +74,7 @@ The platform has three distinct portals — Consumer, Pharmacy, and Admin — ea
 
 | Layer | Technology |
 |---|---|
-| Runtime | Node.js 20 LTS |
+| Runtime | Node.js 22 LTS |
 | Framework | Express.js 5 |
 | Language | TypeScript 5 |
 | ORM | Prisma 7 with `@prisma/adapter-pg` |
@@ -97,7 +97,7 @@ The platform has three distinct portals — Consumer, Pharmacy, and Admin — ea
 | Charts | Recharts |
 | Animations | Framer Motion |
 | HTTP client | Fetch API with JWT refresh interceptor |
-| Testing | Vitest + Testing Library (20 tests) |
+| Testing | Vitest + Testing Library (23 tests) |
 
 ---
 
@@ -165,7 +165,8 @@ Backend: `http://localhost:3000` · API Docs: `http://localhost:3000/api/docs`
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22+
+- pnpm (`npm install -g pnpm`)
 - PostgreSQL 16
 - A Cloudinary account (free tier is fine for development)
 
@@ -174,11 +175,11 @@ Backend: `http://localhost:3000` · API Docs: `http://localhost:3000/api/docs`
 ```bash
 # Backend
 cd backend
-npm install
+pnpm install
 
 # Frontend
 cd ../frontend
-npm install
+pnpm install
 ```
 
 ### 2. Configure environment
@@ -196,23 +197,23 @@ Edit `backend/.env` with your values — see [Environment Variables](#environmen
 cd backend
 
 # Run all migrations
-npx prisma migrate deploy
+pnpm exec prisma migrate deploy
 
 # Generate the Prisma client
-npx prisma generate
+pnpm exec prisma generate
 
 # Seed with realistic sample data
-npm run db:seed
+pnpm run db:seed
 ```
 
 ### 4. Run in development
 
 ```bash
 # Terminal 1 — Backend (hot reload)
-cd backend && npm run dev
+cd backend && pnpm run dev
 
 # Terminal 2 — Frontend (Vite HMR)
-cd frontend && npm run dev
+cd frontend && pnpm run dev
 ```
 
 Backend runs on `http://localhost:3000`, frontend on `http://localhost:5173`.
@@ -248,8 +249,8 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ### Running migrations
 
 ```bash
-npx prisma migrate deploy   # production-safe, applies pending migrations
-npx prisma migrate dev       # development only, creates new migrations
+pnpm exec prisma migrate deploy   # production-safe, applies pending migrations
+pnpm exec prisma migrate dev       # development only, creates new migrations
 ```
 
 ### Seeding
@@ -257,7 +258,7 @@ npx prisma migrate dev       # development only, creates new migrations
 The seed file (`prisma/seed.ts`) creates a full realistic dataset:
 
 ```bash
-npm run db:seed
+pnpm run db:seed
 ```
 
 **What gets created:**
@@ -281,9 +282,9 @@ See [Test Credentials](#test-credentials) for login details.
 | Setting | Value |
 |---|---|
 | **Environment** | Node |
-| **Build command** | `npm install && npm run build` |
-| **Start command** | `npm start` |
-| **Node version** | 20 |
+| **Build command** | `npm install -g pnpm && NODE_ENV=development pnpm install && pnpm run build` |
+| **Start command** | `node dist/index.js` |
+| **Node version** | 22 |
 
 **Environment variables** — add all values from `.env.example` in the Render dashboard under Environment → Environment Variables.
 
@@ -292,14 +293,14 @@ See [Test Credentials](#test-credentials) for login details.
 **Post-deploy:** Run migrations once via Render Shell or add to build command:
 ```bash
 # Add to Build command if you want auto-migration:
-npm install && npx prisma migrate deploy && npm run build
+npm install -g pnpm && NODE_ENV=development pnpm install && pnpm exec prisma migrate deploy && pnpm run build
 ```
 
 ### Frontend (Static Site)
 
 | Setting | Value |
 |---|---|
-| **Build command** | `npm install && npm run build` |
+| **Build command** | `pnpm install && pnpm run build` |
 | **Publish directory** | `dist` |
 
 **Environment variables:**
@@ -314,7 +315,7 @@ npm install && npx prisma migrate deploy && npm run build
 
 The codebase imports TypeScript files with `.ts` extensions (e.g. `import './config/env.ts'`). This is valid for `tsx` (the dev runner) and `esbuild`, but **incompatible with `tsc` emit mode** — `tsc` requires extensions to be `.js` in output-targeting mode, causing `TS5097` errors.
 
-`esbuild` strips types and resolves extensions natively, producing a working `dist/index.js` in under a second. Run `npm run typecheck` locally for type safety checks.
+`esbuild` strips types and resolves extensions natively, producing a working `dist/index.js` in under a second. Run `pnpm run typecheck` locally for type safety checks.
 
 ---
 
@@ -365,7 +366,7 @@ frontend/
 │   ├── router/                # Route guards (ConsumerGuard, PharmacyGuard, AdminGuard)
 │   ├── store/                 # Zustand stores: auth, cart, location, order, toast
 │   ├── styles/                # Design tokens (CSS vars), global styles
-│   └── __tests__/             # Vitest + Testing Library (20 tests)
+│   └── __tests__/             # Vitest + Testing Library (23 tests)
 ├── vitest.config.js
 └── package.json
 ```
@@ -460,7 +461,7 @@ Every response follows:
 
 ## Test Credentials
 
-After running `npm run db:seed`:
+After running `pnpm run db:seed`:
 
 ### Admin
 | Field | Value |
@@ -489,14 +490,14 @@ After running `npm run db:seed`:
 
 ```bash
 # Backend — 38 unit tests
-cd backend && npm test
+cd backend && pnpm test
 
-# Frontend — 20 unit tests
-cd frontend && npm test
+# Frontend — 23 unit tests
+cd frontend && pnpm test
 
 # With coverage
-cd backend && npm run test:coverage
-cd frontend && npm run test:coverage
+cd backend && pnpm run test:coverage
+cd frontend && pnpm run test:coverage
 ```
 
 Tests cover: auth (register/login/refresh/logout), inventory (OTC enforcement, MRP cap, Schedule H/H1/X blocking), order rules (COD limit, stock validation, state machine), platform settings, cart store (add/remove/qty/cross-store switch), API client (401 refresh, auth bypass, logout dispatch).

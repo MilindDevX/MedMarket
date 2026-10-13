@@ -7,17 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Planned
-- **Pharmacy Leaderboard** (Admin Panel)
-  - Overall rankings table: all approved pharmacies ranked by GMV, Orders, Fulfillment %, Avg Order Value, and Last Active — sortable by any column
-  - City-wise rankings: filter leaderboard by city to see local market leaders
-  - Rank badges: 🥇🥈🥉 for top 3; ⚠️ at-risk flag for bottom 20% (low fulfillment or inactive >7 days)
-  - Trend indicators (↑ ↓ →) based on week-over-week GMV change
-- **AI Platform Insights** (Admin Panel)
-  - New endpoint `GET /api/v1/admin/ai-insights` — aggregates platform-wide GMV, fulfillment rates, supply gaps, pending application backlog, and complaint clusters
-  - AI returns 5 platform-level insights grounded in leaderboard data (e.g. anomaly detection, supply gap cities, approval backlog impact)
-  - Uses existing `generateWithFallback()` with Gemini → Groq fallback — no new AI infra required
-  - Frontend: AI Insights card with Regenerate button displayed above the leaderboard on the Admin Analytics page
+### Fixed
+- Confirming "Switch store?" on a store page now replaces the cart with the chosen item instead of leaving it empty
+- Admin portal is navigable below 900px: menu button opens the sidebar as a slide-in drawer (closes on link, overlay tap or Escape)
+- `render.yaml` lists `JWT_ACCESS_SECRET`, the name the backend actually requires (was `JWT_SECRET`)
+
+### Security
+- Dependencies updated within semver ranges in backend and frontend, clearing the critical `proxy-addr` advisory and the high `multer` and `react-router` advisories
+- Backend pins `mysql2` (pulled in by the Prisma CLI) past its published CVE fixes
 
 ---
 
