@@ -1,24 +1,11 @@
 import type { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../config/prisma.ts';
-import { cloudinary, uploadToCloudinary, deleteFromCloudinary } from '../lib/cloudinary.ts';
+import { uploadToCloudinary, deleteFromCloudinary, documentUrl } from '../lib/cloudinary.ts';
 import { successResponse, errorResponse } from '../utils/response.ts';
 
 const VALID_DOC_TYPES = ['drug_license', 'gst_certificate', 'aadhaar', 'pan', 'store_photo'] as const;
 type DocType = typeof VALID_DOC_TYPES[number];
-
-function docUrl(s3_key: string, mime_type: string): string {
-  if (mime_type === 'application/pdf') {
-    // For PDFs stored as 'raw' resource type, generate a direct URL.
-    // Append fl_attachment:false is not needed for raw — just use direct URL.
-    return cloudinary.url(s3_key, {
-      resource_type: 'raw',
-      secure: true,
-      flags: 'attachment:false',
-    });
-  }
-  return cloudinary.url(s3_key, { resource_type: 'image', secure: true });
-}
 
 export async function uploadDocument(req: Request, res: Response) {
   try {
@@ -87,7 +74,7 @@ export async function getDocumentUrl(req: Request, res: Response) {
     const isOwner = store?.id === doc.store_id;
     if (!isAdmin && !isOwner) return errorResponse(res, 'Access denied.', 403);
 
-    return successResponse(res, { url: docUrl(doc.s3_key, doc.mime_type) }, 'Document URL fetched');
+    return successResponse(res, { url: documentUrl(doc.s3_key, doc.mime_type) }, 'Document URL fetched');
   } catch {
     return errorResponse(res, 'Something went wrong.', 500);
   }
@@ -105,7 +92,7 @@ export async function listDocuments(req: Request, res: Response) {
 
     return successResponse(
       res,
-      docs.map((doc: any) => ({ ...doc, url: docUrl(doc.s3_key, doc.mime_type) })),
+      docs.map((doc: any) => ({ ...doc, url: documentUrl(doc.s3_key, doc.mime_type) })),
       'Documents fetched',
     );
   } catch {

@@ -10,7 +10,7 @@ import type { Request, Response } from 'express';
 import prisma from '../config/prisma.ts';
 import { generateWithFallback, AiUnavailableError, type ImageData } from '../lib/ai.ts';
 import { successResponse, errorResponse } from '../utils/response.ts';
-import { cloudinary } from '../lib/cloudinary.ts';
+import { documentUrl } from '../lib/cloudinary.ts';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: Map AiUnavailableError to a friendly HTTP response
@@ -48,10 +48,7 @@ export async function verifyPharmacyDocuments(req: Request, res: Response) {
 
     // Build Cloudinary URLs for each document
     const docsWithUrls = (store.documents || []).map((doc: any) => {
-      const resourceType = doc.mime_type === 'application/pdf' ? 'raw' : 'image';
-      const url = doc.s3_key
-        ? cloudinary.url(doc.s3_key, { resource_type: resourceType, secure: true })
-        : null;
+      const url = doc.s3_key ? documentUrl(doc.s3_key, doc.mime_type) : null;
       return { ...doc, url };
     });
 

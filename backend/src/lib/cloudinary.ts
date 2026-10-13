@@ -40,6 +40,22 @@ export async function uploadToCloudinary(
   });
 }
 
+const PDF_LINK_TTL_SECONDS = 60 * 60;
+
+// Cloudinary blocks public delivery of PDFs by default ("deny or ACL failure"),
+// so PDFs are served through a signed API download link that expires.
+export function documentUrl(publicId: string, mimeType: string): string {
+  applyConfig();
+  if (mimeType === 'application/pdf') {
+    return cloudinary.utils.private_download_url(publicId, '', {
+      resource_type: 'raw',
+      type:          'upload',
+      expires_at:    Math.floor(Date.now() / 1000) + PDF_LINK_TTL_SECONDS,
+    });
+  }
+  return cloudinary.url(publicId, { resource_type: 'image', secure: true });
+}
+
 export async function deleteFromCloudinary(publicId: string, mimeType: string): Promise<void> {
   applyConfig();
   const resourceType = mimeType === 'application/pdf' ? 'raw' : 'image';
