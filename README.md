@@ -1,6 +1,7 @@
 # MedMarket India
 
 [![CI](https://github.com/MilindDevX/MedMarket/actions/workflows/ci.yml/badge.svg)](https://github.com/MilindDevX/MedMarket/actions/workflows/ci.yml)
+[![Live Demo](https://img.shields.io/badge/live%20demo-med--market--self.vercel.app-000?logo=vercel)](https://med-market-self.vercel.app)
 [![Backend Tests](https://img.shields.io/badge/backend%20tests-38%20passing-brightgreen)](https://github.com/MilindDevX/MedMarket/actions)
 [![Frontend Tests](https://img.shields.io/badge/frontend%20tests-23%20passing-brightgreen)](https://github.com/MilindDevX/MedMarket/actions)
 [![API Docs](https://img.shields.io/badge/API%20docs-Swagger%20UI-85EA2D?logo=swagger)](https://medmarket-g08v.onrender.com/api/docs)

@@ -11,6 +11,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Confirming "Switch store?" on a store page now replaces the cart with the chosen item instead of leaving it empty
 - Admin portal is navigable below 900px: menu button opens the sidebar as a slide-in drawer (closes on link, overlay tap or Escape)
 - `render.yaml` lists `JWT_ACCESS_SECRET`, the name the backend actually requires (was `JWT_SECRET`)
+- Uploaded PDF documents can be opened again: Cloudinary denies public PDF delivery by default, so PDF links are now signed download URLs that expire after an hour (one `documentUrl()` helper replaces three copies)
+- `pnpm run db:seed` works again: seeded store documents use the current `StoreDocument` fields, and `prisma/seed.ts` is now type-checked
 
 ### Security
 - Dependencies updated within semver ranges in backend and frontend, clearing the critical `proxy-addr` advisory and the high `multer` and `react-router` advisories
