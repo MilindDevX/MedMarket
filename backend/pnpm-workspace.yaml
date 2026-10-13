@@ -4,3 +4,7 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   prisma: true
+
+overrides:
+  # prisma CLI pulls mysql2 even though this app uses Postgres; pin past CVE fixes
+  mysql2: '^3.23.1'
