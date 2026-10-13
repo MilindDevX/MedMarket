@@ -161,15 +161,17 @@ async function main() {
         data: [
           {
             store_id: store.id,
-            document_type: 'drug_license',
-            file_url: `https://res.cloudinary.com/demo/raw/upload/dl_${store.id}.pdf`,
-            uploaded_at: new Date(),
+            doc_type: 'drug_license',
+            s3_key: `drug_license_seed_${store.id}`,
+            original_filename: 'drug_license.pdf',
+            mime_type: 'application/pdf',
           },
           {
             store_id: store.id,
-            document_type: 'gst_certificate',
-            file_url: `https://res.cloudinary.com/demo/raw/upload/gst_${store.id}.pdf`,
-            uploaded_at: new Date(),
+            doc_type: 'gst_certificate',
+            s3_key: `gst_certificate_seed_${store.id}`,
+            original_filename: 'gst_certificate.pdf',
+            mime_type: 'application/pdf',
           },
         ],
       });
