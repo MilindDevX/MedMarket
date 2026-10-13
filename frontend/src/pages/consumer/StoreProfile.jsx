@@ -26,6 +26,11 @@ export default function StoreProfile() {
     if (cartStoreId && cartStoreId !== store.id) {
       setSwitchWarning(inv); return;
     }
+    addToCart(inv);
+  };
+
+  // Adds without the store guard; cartStore itself clears items from another store.
+  const addToCart = (inv) => {
     addItem({
       medicineId:   inv.medicine_id,
       medicineName: inv.medicine.name,
@@ -42,7 +47,7 @@ export default function StoreProfile() {
 
   const confirmSwitch = () => {
     useCartStore.getState().clearCart();
-    handleAdd(switchWarning);
+    addToCart(switchWarning);
     setSwitchWarning(null);
   };
 

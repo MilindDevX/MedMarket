@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Store, Database, ShoppingCart,
-  BarChart2, MessageSquare, Users, Settings, LogOut, ChevronRight, Shield, Bell
+  BarChart2, MessageSquare, Users, Settings, LogOut, ChevronRight, Shield, Bell, Menu
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import styles from './AdminLayout.module.css';
@@ -25,6 +26,14 @@ export default function AdminLayout() {
   const { user, logout } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e) => { if (e.key === 'Escape') setMobileOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [mobileOpen]);
 
   const handleLogout = () => {
     logout();
@@ -33,7 +42,8 @@ export default function AdminLayout() {
 
   return (
     <div className={styles.shell}>
-      <aside className={styles.sidebar}>
+      {mobileOpen && <div className={styles.overlay} onClick={() => setMobileOpen(false)} />}
+      <aside id="admin-sidebar" className={`${styles.sidebar} ${mobileOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.brand}>
           <Shield size={16} className={styles.brandIcon} />
           <span className={styles.brandName}>MedMarket</span>
@@ -46,6 +56,7 @@ export default function AdminLayout() {
               key={to}
               to={to}
               end={to === '/admin/dashboard'}
+              onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
               }
@@ -73,6 +84,18 @@ export default function AdminLayout() {
       </aside>
 
       <main className={styles.main}>
+        <div className={styles.topbar}>
+          <button
+            className={styles.hamburger}
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={mobileOpen}
+            aria-controls="admin-sidebar"
+          >
+            <Menu size={20} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+          <span className={styles.topbarBrand}>MedMarket Admin</span>
+        </div>
         <div className={styles.content}>
           <AnimatePresence mode="wait">
             <PageTransition key={location.pathname}>
